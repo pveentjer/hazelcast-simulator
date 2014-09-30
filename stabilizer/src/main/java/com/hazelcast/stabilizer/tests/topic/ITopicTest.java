@@ -41,7 +41,7 @@ public class ITopicTest {
     public int threadCount = 5;
     public int listenersPerTopic = 1;
     public int logFrequency = 100000;
-    public int performanceUpdateFrequency = 100000;
+    public int performanceUpdateFrequency = 100;
     public int maxProcessingDelayNanos = 0;
     public int maxPublicationDelayNanos = 1000;
     // the maximum period the verification process is going to wait till the correct number of messags
