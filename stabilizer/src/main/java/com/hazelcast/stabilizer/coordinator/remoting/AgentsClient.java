@@ -172,7 +172,7 @@ public class AgentsClient {
             } catch (ExecutionException e) {
                 log.severe(e);
             } catch (TimeoutException e) {
-                log.severe(e);
+                log.warning("Failed to retrieve failures due to a timeout.");
             }
         }
         return result;
