@@ -200,8 +200,7 @@ public class AtomicLongTest {
         int unusedThreads = 0;
         int imbalancedThread = 0;
         double desiredLoad = desiredLoadPercentage * completedByAllThreads;
-        double max = 1.5 * desiredLoad;
-        double min = 0.5 * desiredLoad;
+        double max = 3 * desiredLoad;
 
         for (PartitionOperationThread thread : partitionThreads) {
             int partitionCount = partitionsPerThread.get(thread) == null ? 0 : partitionsPerThread.get(thread);
@@ -213,7 +212,7 @@ public class AtomicLongTest {
                 unusedThreads++;
             }
 
-            if (completedByThread < min || completedByThread > max) {
+            if (completedByThread >= max) {
                 imbalancedThread++;
             }
 
