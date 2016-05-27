@@ -178,7 +178,7 @@ public class AtomicLongTest {
         OperationServiceImpl operationServiceImpl = (OperationServiceImpl) getNode(targetInstance).nodeEngine.getOperationService();
         OperationExecutorImpl executor = (OperationExecutorImpl) operationServiceImpl.getOperationExecutor();
 
-        Field field = OperationServiceImpl.class.getDeclaredField("partitionThreads");
+        Field field = OperationExecutorImpl.class.getDeclaredField("partitionThreads");
         field.setAccessible(true);
         PartitionOperationThread[] partitionThreads = (PartitionOperationThread[]) field.get(executor);
 
