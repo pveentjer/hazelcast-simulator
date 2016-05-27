@@ -32,6 +32,7 @@ import com.hazelcast.simulator.tests.helpers.KeyLocality;
 import com.hazelcast.simulator.utils.ReflectionUtils;
 import com.hazelcast.simulator.worker.selector.OperationSelectorBuilder;
 import com.hazelcast.simulator.worker.tasks.AbstractWorker;
+import com.hazelcast.spi.OperationService;
 import com.hazelcast.spi.impl.operationexecutor.impl.OperationExecutorImpl;
 import com.hazelcast.spi.impl.operationexecutor.impl.PartitionOperationThread;
 import com.hazelcast.spi.impl.operationservice.impl.OperationServiceImpl;
@@ -177,7 +178,8 @@ public class AtomicLongTest {
         OperationServiceImpl operationServiceImpl = (OperationServiceImpl) getNode(targetInstance).nodeEngine.getOperationService();
         OperationExecutorImpl executor = (OperationExecutorImpl) operationServiceImpl.getOperationExecutor();
 
-        Field field = ReflectionUtils.getField(OperationExecutorImpl.class, "partitionThreads", PartitionOperationThread[].class);
+        Field field = OperationServiceImpl.class.getDeclaredField("partitionThreads");
+        field.setAccessible(true);
         PartitionOperationThread[] partitionThreads = (PartitionOperationThread[]) field.get(executor);
 
         Map<PartitionOperationThread, Integer> partitionsPerThread = new HashMap<PartitionOperationThread, Integer>();
