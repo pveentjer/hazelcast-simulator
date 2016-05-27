@@ -215,8 +215,8 @@ public class AtomicLongTest {
                     + " actual load: %4.3f %%", thread.getId(), partitionCount, completedByThread, actualLoad));
         }
 
-        LOGGER.info("Total difference: " + totalDifference + "%"+
-                ", unused threads: " + unusedThreads + "%");
+        LOGGER.info("total-difference: " + totalDifference + "%"+
+                ", unused -threads: " + unusedThreads + "%");
     }
 
     private PartitionOperationThread[] getPartitionOperationThreads(OperationExecutorImpl executor) throws NoSuchFieldException, IllegalAccessException {
