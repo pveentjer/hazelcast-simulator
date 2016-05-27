@@ -88,7 +88,9 @@ public class AtomicLongTest {
     }
 
     @Teardown
-    public void teardown() {
+    public void teardown() throws Exception {
+        display();
+
         for (IAtomicLong counter : counters) {
             counter.destroy();
         }
@@ -107,8 +109,7 @@ public class AtomicLongTest {
     }
 
     @Verify
-    public void verify() throws Exception{
-        display();
+    public void verify() {
 
         String serviceName = totalCounter.getServiceName();
         String totalName = totalCounter.getName();
@@ -184,14 +185,14 @@ public class AtomicLongTest {
             int index = localPartition.getPartitionId() % partitionThreads.length;
             PartitionOperationThread thread = partitionThreads[index];
             Integer count = partitionsPerThread.get(thread);
-            if(count == null){
+            if (count == null) {
                 count = 0;
             }
-            partitionsPerThread.put(thread, count+1);
+            partitionsPerThread.put(thread, count + 1);
         }
 
-        for(PartitionOperationThread thread: partitionThreads){
-            LOGGER.info(thread+" partitions: "+partitionsPerThread.get(thread));
+        for (PartitionOperationThread thread : partitionThreads) {
+            LOGGER.info(thread + " partitions: " + partitionsPerThread.get(thread));
         }
     }
 
