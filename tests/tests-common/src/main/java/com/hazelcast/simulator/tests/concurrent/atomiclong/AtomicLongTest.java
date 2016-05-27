@@ -19,6 +19,7 @@ import com.hazelcast.core.DistributedObject;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IAtomicLong;
 import com.hazelcast.core.Partition;
+import com.hazelcast.internal.util.counters.SwCounter;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.logging.Logger;
 import com.hazelcast.simulator.test.TestContext;
@@ -29,11 +30,10 @@ import com.hazelcast.simulator.test.annotations.Teardown;
 import com.hazelcast.simulator.test.annotations.Verify;
 import com.hazelcast.simulator.test.annotations.Warmup;
 import com.hazelcast.simulator.tests.helpers.KeyLocality;
-import com.hazelcast.simulator.utils.ReflectionUtils;
 import com.hazelcast.simulator.worker.selector.OperationSelectorBuilder;
 import com.hazelcast.simulator.worker.tasks.AbstractWorker;
-import com.hazelcast.spi.OperationService;
 import com.hazelcast.spi.impl.operationexecutor.impl.OperationExecutorImpl;
+import com.hazelcast.spi.impl.operationexecutor.impl.OperationThread;
 import com.hazelcast.spi.impl.operationexecutor.impl.PartitionOperationThread;
 import com.hazelcast.spi.impl.operationservice.impl.OperationServiceImpl;
 
@@ -178,9 +178,7 @@ public class AtomicLongTest {
         OperationServiceImpl operationServiceImpl = (OperationServiceImpl) getNode(targetInstance).nodeEngine.getOperationService();
         OperationExecutorImpl executor = (OperationExecutorImpl) operationServiceImpl.getOperationExecutor();
 
-        Field field = OperationExecutorImpl.class.getDeclaredField("partitionThreads");
-        field.setAccessible(true);
-        PartitionOperationThread[] partitionThreads = (PartitionOperationThread[]) field.get(executor);
+        PartitionOperationThread[] partitionThreads = getPartitionOperationThreads(executor);
 
         Map<PartitionOperationThread, Integer> partitionsPerThread = new HashMap<PartitionOperationThread, Integer>();
         for (Partition localPartition : localPartitions) {
@@ -193,9 +191,39 @@ public class AtomicLongTest {
             partitionsPerThread.put(thread, count + 1);
         }
 
+        long totalCompleted = getTotalCompletedCount(partitionThreads);
+        double averageLoad = (100d * totalCompleted) / partitionThreads.length;
+        LOGGER.info("Expected share: " + averageLoad + "%");
         for (PartitionOperationThread thread : partitionThreads) {
-            LOGGER.info(thread + " partitions: " + partitionsPerThread.get(thread));
+            Integer count = partitionsPerThread.get(thread);
+            long completed = getTotalCompletedCount(thread);
+            double actualLoad = 100d * completed / totalCompleted;
+            LOGGER.info(thread.getId() + " partitions: " + (count == null ? 0 : count)
+                    + " tasks: " + completed
+                    + " actual load:" + actualLoad + "%"
+                    + " load diff:" + (100d * actualLoad / averageLoad) + " %"
+            );
         }
+    }
+
+    private PartitionOperationThread[] getPartitionOperationThreads(OperationExecutorImpl executor) throws NoSuchFieldException, IllegalAccessException {
+        Field field = OperationExecutorImpl.class.getDeclaredField("partitionThreads");
+        field.setAccessible(true);
+        return (PartitionOperationThread[]) field.get(executor);
+    }
+
+    private long getTotalCompletedCount(PartitionOperationThread thread) throws NoSuchFieldException, IllegalAccessException {
+        Field field = OperationThread.class.getDeclaredField("completedTotalCount");
+        field.setAccessible(true);
+        return ((SwCounter) field.get(thread)).get();
+    }
+
+    private long getTotalCompletedCount(PartitionOperationThread[] threads) throws NoSuchFieldException, IllegalAccessException {
+        long result = 0;
+        for (PartitionOperationThread thread : threads) {
+            result += getTotalCompletedCount(thread);
+        }
+        return result;
     }
 
     public static void main(String[] args) throws Exception {
