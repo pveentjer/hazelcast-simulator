@@ -193,11 +193,16 @@ public class AtomicLongTest {
 
         long completedByAllThreads = getTotalCompletedCount(partitionThreads);
 
-        double desiredLoad = 100d / partitionThreads.length;
-        LOGGER.info("Expected share: " + desiredLoad + "%");
+        double desiredLoadPercentage = 100d / partitionThreads.length;
+        LOGGER.info("Expected share: " + desiredLoadPercentage + "%");
 
         double totalDifference = 0;
         int unusedThreads = 0;
+        int imbalancedThread = 0;
+        double desiredLoad = desiredLoadPercentage * completedByAllThreads;
+        double max = 1.5 * desiredLoad;
+        double min = 0.5 * desiredLoad;
+
         for (PartitionOperationThread thread : partitionThreads) {
             int partitionCount = partitionsPerThread.get(thread) == null ? 0 : partitionsPerThread.get(thread);
 
@@ -208,15 +213,20 @@ public class AtomicLongTest {
                 unusedThreads++;
             }
 
-            totalDifference += Math.abs(actualLoad - desiredLoad);
+            if (completedByThread < min || completedByThread > max) {
+                imbalancedThread++;
+            }
+
+            totalDifference += Math.abs(actualLoad - desiredLoadPercentage);
             LOGGER.info(String.format("PartitionThread-%d"
                     + " partitions: %d"
                     + " tasks: %d"
                     + " actual load: %4.3f %%", thread.getId(), partitionCount, completedByThread, actualLoad));
         }
 
-        LOGGER.info("total-difference: " + totalDifference + "%"+
-                ", unused-threads: " + unusedThreads);
+        LOGGER.info("total-difference: " + totalDifference + "%"
+                + ", unused-threads: " + unusedThreads
+                + ", imbalanced-threads: " + imbalancedThread);
     }
 
     private PartitionOperationThread[] getPartitionOperationThreads(OperationExecutorImpl executor) throws NoSuchFieldException, IllegalAccessException {
