@@ -99,7 +99,7 @@ public class TestHistogramContainer {
 
     private void logProbesResultInHumanReadableFormat(String testId, Result result) {
         for (String probeName : result.probeNames()) {
-            LOGGER.info(format("%s Results of probe %s:%n%s", testId, probeName, result.toHumanString(probeName)));
+         //   LOGGER.info(format("%s Results of probe %s:%n%s", testId, probeName, result.toHumanString(probeName)));
         }
     }
 }
