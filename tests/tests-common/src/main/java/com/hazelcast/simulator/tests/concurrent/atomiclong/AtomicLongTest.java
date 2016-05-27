@@ -191,18 +191,17 @@ public class AtomicLongTest {
             partitionsPerThread.put(thread, count + 1);
         }
 
-        long totalCompleted = getTotalCompletedCount(partitionThreads);
-        double averageLoad = (100d * totalCompleted) / partitionThreads.length;
-        LOGGER.info("Expected share: " + averageLoad + "%");
+        long completedByAllThreads = getTotalCompletedCount(partitionThreads);
+        double desiredLoad = 100d / partitionThreads.length;
+        LOGGER.info("Expected share: " + desiredLoad + "%");
         for (PartitionOperationThread thread : partitionThreads) {
             Integer count = partitionsPerThread.get(thread);
-            long completed = getTotalCompletedCount(thread);
-            double actualLoad = 100d * completed / totalCompleted;
-            LOGGER.info(thread.getId() + " partitions: " + (count == null ? 0 : count)
-                    + " tasks: " + completed
-                    + " actual load:" + actualLoad + "%"
-                    + " load diff:" + (100d * actualLoad / averageLoad) + " %"
-            );
+            long completedByThread = getTotalCompletedCount(thread);
+            double actualLoad = 100d * completedByThread / completedByAllThreads;
+            LOGGER.info("PartitionThread-" + thread.getId()
+                    + " partitions: " + (count == null ? 0 : count)
+                    + " tasks: " + completedByThread
+                    + " actual load:" + actualLoad + "%");
         }
     }
 
