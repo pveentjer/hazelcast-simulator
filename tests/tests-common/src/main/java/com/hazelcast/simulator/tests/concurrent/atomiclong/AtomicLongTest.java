@@ -197,11 +197,16 @@ public class AtomicLongTest {
         LOGGER.info("Expected share: " + desiredLoad + "%");
 
         double totalDifference = 0;
+        int unusedThreads = 10;
         for (PartitionOperationThread thread : partitionThreads) {
             int partitionCount = partitionsPerThread.get(thread) == null ? 0 : partitionsPerThread.get(thread);
 
             long completedByThread = getTotalCompletedCount(thread);
             double actualLoad = 100d * completedByThread / completedByAllThreads;
+
+            if (completedByThread < 100) {
+                unusedThreads++;
+            }
 
             totalDifference += Math.abs(actualLoad - desiredLoad);
             LOGGER.info(String.format("PartitionThread-%d"
@@ -210,8 +215,8 @@ public class AtomicLongTest {
                     + " actual load: %4.3f %%", thread.getId(), partitionCount, completedByThread, actualLoad));
         }
 
-        LOGGER.info("Total difference : " + totalDifference + "%");
-
+        LOGGER.info("Total difference: " + totalDifference + "%"+
+                ", unused threads: " + unusedThreads + "%");
     }
 
     private PartitionOperationThread[] getPartitionOperationThreads(OperationExecutorImpl executor) throws NoSuchFieldException, IllegalAccessException {
