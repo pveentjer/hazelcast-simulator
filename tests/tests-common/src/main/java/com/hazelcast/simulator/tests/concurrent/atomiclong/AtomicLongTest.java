@@ -207,7 +207,7 @@ public class AtomicLongTest {
             LOGGER.info(String.format("PartitionThread-%d"
                     + " partitions: %d"
                     + " tasks: %d"
-                    + " actual load: %4.3f%", thread.getId(), partitionCount, completedByThread, actualLoad));
+                    + " actual load: %4.3f %%", thread.getId(), partitionCount, completedByThread, actualLoad));
         }
 
         LOGGER.info("Total difference : " + totalDifference + "%");
