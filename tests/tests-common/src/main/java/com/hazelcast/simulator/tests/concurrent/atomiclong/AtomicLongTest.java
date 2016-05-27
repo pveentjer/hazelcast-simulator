@@ -18,6 +18,7 @@ package com.hazelcast.simulator.tests.concurrent.atomiclong;
 import com.hazelcast.core.DistributedObject;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IAtomicLong;
+import com.hazelcast.core.Partition;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.logging.Logger;
 import com.hazelcast.simulator.test.TestContext;
@@ -28,9 +29,20 @@ import com.hazelcast.simulator.test.annotations.Teardown;
 import com.hazelcast.simulator.test.annotations.Verify;
 import com.hazelcast.simulator.test.annotations.Warmup;
 import com.hazelcast.simulator.tests.helpers.KeyLocality;
+import com.hazelcast.simulator.utils.ReflectionUtils;
 import com.hazelcast.simulator.worker.selector.OperationSelectorBuilder;
 import com.hazelcast.simulator.worker.tasks.AbstractWorker;
+import com.hazelcast.spi.impl.operationexecutor.impl.OperationExecutorImpl;
+import com.hazelcast.spi.impl.operationexecutor.impl.PartitionOperationThread;
+import com.hazelcast.spi.impl.operationservice.impl.OperationServiceImpl;
 
+import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+
+import static com.hazelcast.simulator.tests.helpers.HazelcastTestUtils.getNode;
 import static com.hazelcast.simulator.tests.helpers.HazelcastTestUtils.getOperationCountInformation;
 import static com.hazelcast.simulator.tests.helpers.HazelcastTestUtils.getPartitionDistributionInformation;
 import static com.hazelcast.simulator.tests.helpers.KeyUtils.generateStringKeys;
@@ -95,7 +107,9 @@ public class AtomicLongTest {
     }
 
     @Verify
-    public void verify() {
+    public void verify() throws Exception{
+        display();
+
         String serviceName = totalCounter.getServiceName();
         String totalName = totalCounter.getName();
 
@@ -148,6 +162,36 @@ public class AtomicLongTest {
         private IAtomicLong getRandomCounter() {
             int index = randomInt(counters.length);
             return counters[index];
+        }
+    }
+
+    public void display() throws Exception {
+        List<Partition> localPartitions = new LinkedList<Partition>();
+        for (Partition partition : targetInstance.getPartitionService().getPartitions()) {
+            if (targetInstance.getCluster().getLocalMember().equals(partition.getOwner())) {
+                localPartitions.add(partition);
+            }
+        }
+
+        OperationServiceImpl operationServiceImpl = (OperationServiceImpl) getNode(targetInstance).nodeEngine.getOperationService();
+        OperationExecutorImpl executor = (OperationExecutorImpl) operationServiceImpl.getOperationExecutor();
+
+        Field field = ReflectionUtils.getField(OperationExecutorImpl.class, "partitionThreads", PartitionOperationThread[].class);
+        PartitionOperationThread[] partitionThreads = (PartitionOperationThread[]) field.get(executor);
+
+        Map<PartitionOperationThread, Integer> partitionsPerThread = new HashMap<PartitionOperationThread, Integer>();
+        for (Partition localPartition : localPartitions) {
+            int index = localPartition.getPartitionId() % partitionThreads.length;
+            PartitionOperationThread thread = partitionThreads[index];
+            Integer count = partitionsPerThread.get(thread);
+            if(count == null){
+                count = 0;
+            }
+            partitionsPerThread.put(thread, count+1);
+        }
+
+        for(PartitionOperationThread thread: partitionThreads){
+            LOGGER.info(thread+" partitions: "+partitionsPerThread.get(thread));
         }
     }
 
