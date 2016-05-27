@@ -201,7 +201,7 @@ public class AtomicLongTest {
         int imbalancedThread = 0;
 
         double desiredLoad = desiredLoadPercentage * completedByAllThreads;
-        double max = 3 * desiredLoad;
+        double max = 2 * desiredLoad;
         //double min = 0.5 * desiredLoad;
 
         for (PartitionOperationThread thread : partitionThreads) {
