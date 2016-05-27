@@ -201,10 +201,10 @@ public class AtomicLongTest {
 
             long completedByThread = getTotalCompletedCount(thread);
             double actualLoad = 100d * completedByThread / completedByAllThreads;
-            LOGGER.info("PartitionThread-" + thread.getId()
-                    + " partitions: " + partitionCount
-                    + " tasks: " + completedByThread
-                    + " actual load:" + actualLoad + "%");
+            LOGGER.info(String.format("PartitionThread-%d"
+                    + " partitions: %d"
+                    + " tasks: %d"
+                    + " actual load: %4.3f%", thread.getId(),partitionCount ,completedByThread,actualLoad);
         }
     }
 
