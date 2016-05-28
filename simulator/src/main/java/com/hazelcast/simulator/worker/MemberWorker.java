@@ -165,7 +165,7 @@ public final class MemberWorker implements Worker {
     public static void main(String[] args) {
         Random random = new Random();
         try {
-            Thread.sleep(random.nextInt(30000));
+            Thread.sleep(random.nextInt(15000));
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
