@@ -121,7 +121,12 @@ public class RemoteClient {
             spawner.spawn(new Runnable() {
                 @Override
                 public void run() {
-                    CreateWorkerOperation operation = new CreateWorkerOperation(settingsList, startupDelayMs);
+                    try {
+                        Thread.sleep(startupDelayMs);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    CreateWorkerOperation operation = new CreateWorkerOperation(settingsList, 0);
                     Response response = coordinatorConnector.write(agentAddress, operation);
 
                     ResponseType responseType = response.getFirstErrorResponseType();
