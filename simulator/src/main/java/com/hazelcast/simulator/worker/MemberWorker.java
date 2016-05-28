@@ -28,6 +28,7 @@ import org.apache.log4j.Logger;
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -162,6 +163,13 @@ public final class MemberWorker implements Worker {
     }
 
     public static void main(String[] args) {
+        Random random = new Random();
+        try {
+            Thread.sleep(random.nextInt(30000));
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
         try {
             startWorker();
         } catch (Exception e) {
