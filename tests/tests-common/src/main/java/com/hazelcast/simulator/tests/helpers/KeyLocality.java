@@ -28,6 +28,11 @@ package com.hazelcast.simulator.tests.helpers;
 public enum KeyLocality {
 
     /**
+     * Generates random keys that are always local and pointing to the 'next' member in the cluster.
+     */
+    CIRCLE,
+
+    /**
      * Generates random generated local keys (keys that point to locally owned partitions).
      *
      * The keys will be perfectly balanced over the partitions.

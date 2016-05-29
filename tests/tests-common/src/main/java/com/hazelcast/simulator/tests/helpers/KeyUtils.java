@@ -20,8 +20,10 @@ import com.hazelcast.core.Member;
 import com.hazelcast.core.Partition;
 import com.hazelcast.core.PartitionService;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -75,6 +77,8 @@ public final class KeyUtils {
             HazelcastInstance hz, KeyLocality keyLocality, int keyCount, int keyLength, String prefix) {
         switch (keyLocality) {
             case LOCAL:
+                return new BalancedStringKeyGenerator(hz, keyLocality, keyCount, keyLength, prefix);
+            case CIRCLE:
                 return new BalancedStringKeyGenerator(hz, keyLocality, keyCount, keyLength, prefix);
             case REMOTE:
                 return new BalancedStringKeyGenerator(hz, keyLocality, keyCount, keyLength, prefix);
@@ -264,6 +268,21 @@ public final class KeyUtils {
                 case LOCAL:
                     for (Partition partition : partitionService.getPartitions()) {
                         if (localMember == null || localMember.equals(partition.getOwner())) {
+                            targetPartitions.add(partition.getPartitionId());
+                        }
+                    }
+                    break;
+                case CIRCLE:
+                    Member targetMember = null;
+                    if (localMember != null) {
+                        List<Member> memberList = new ArrayList<Member>(hz.getCluster().getMembers());
+                        int selfIndex = memberList.indexOf(hz.getCluster().getLocalMember());
+                        int targetIndex = selfIndex + 1 % memberList.size();
+                        targetMember = memberList.get(targetIndex);
+                    }
+
+                    for (Partition partition : partitionService.getPartitions()) {
+                        if (localMember == null || partition.getOwner().equals(targetMember)) {
                             targetPartitions.add(partition.getPartitionId());
                         }
                     }
