@@ -285,7 +285,7 @@ public final class Coordinator {
         }
     }
 
-    void runTestSuite() throws InterruptedException {
+    void runTestSuite() {
         try {
             int testCount = testSuite.size();
             boolean isParallel = (coordinatorParameters.isParallel() && testCount > 1);
@@ -314,7 +314,10 @@ public final class Coordinator {
 
             LOGGER.info("Start waiting");
             Thread.sleep(60000);
-            LOGGER.info("Completed waiting");
+            LOGGER.info("Start waiting");
+
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         } finally {
             int runningWorkerCount = componentRegistry.workerCount();
             echo("Terminating %d Workers...", runningWorkerCount);
