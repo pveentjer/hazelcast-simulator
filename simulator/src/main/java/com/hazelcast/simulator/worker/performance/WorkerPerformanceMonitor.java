@@ -96,6 +96,7 @@ public class WorkerPerformanceMonitor {
         private final ServerConnector serverConnector;
         private final Collection<TestContainer> testContainers;
         private final long intervalNanos;
+        private final AtomicLong counted = new AtomicLong();
 
         private WorkerPerformanceMonitorThread(ServerConnector serverConnector,
                                                Collection<TestContainer> testContainers,
@@ -130,6 +131,7 @@ public class WorkerPerformanceMonitor {
                 }
             }
             sendTestHistograms();
+            LOGGER.info("Counted:"+counted);
         }
 
         private void sendTestHistograms() {
@@ -219,6 +221,8 @@ public class WorkerPerformanceMonitor {
                     }
                 }
             }
+
+            counted.addAndGet(intervalOperationalCount);
 
             testData.tracker.update(intervalHistograms, intervalPercentileLatency, intervalAvgLatency, intervalMaxLatency,
                     intervalOperationalCount, currentTimestamp);
