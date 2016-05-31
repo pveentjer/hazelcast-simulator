@@ -24,6 +24,10 @@ import com.hazelcast.simulator.worker.metronome.Metronome;
 import com.hazelcast.simulator.worker.selector.OperationSelector;
 import com.hazelcast.simulator.worker.selector.OperationSelectorBuilder;
 
+import java.util.concurrent.atomic.AtomicLong;
+
+import static com.amazonaws.services.dynamodbv2.model.ReturnConsumedCapacity.TOTAL;
+
 /**
  * Base implementation of {@link IWorker} which is returned by {@link com.hazelcast.simulator.test.annotations.RunWithWorker}
  * annotated test methods.
@@ -66,6 +70,16 @@ public abstract class AbstractWorker<O extends Enum<O>> extends VeryAbstractWork
                 increaseIteration();
             }
         }
+
+        long total;
+        if(workerProbe.isMeasuringLatency()){
+            total = workerProbe.getIntervalHistogram().getTotalCount();
+        }else{
+            total = workerProbe.get();
+        }
+
+
+        logger.info("worker probe total:"+total);
     }
 
     /**
