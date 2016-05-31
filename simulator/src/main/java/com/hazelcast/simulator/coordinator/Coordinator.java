@@ -172,7 +172,7 @@ public final class Coordinator {
         echoLocal("Performance monitor enabled: %s (%d seconds)", performanceEnabled, performanceIntervalSeconds);
     }
 
-    void run() {
+    void run() throws InterruptedException {
         try {
             checkInstallation(bash, simulatorProperties, componentRegistry);
             uploadFiles();
@@ -285,7 +285,7 @@ public final class Coordinator {
         }
     }
 
-    void runTestSuite() {
+    void runTestSuite() throws InterruptedException {
         try {
             int testCount = testSuite.size();
             boolean isParallel = (coordinatorParameters.isParallel() && testCount > 1);
@@ -311,6 +311,10 @@ public final class Coordinator {
                 runSequential(testCount);
             }
             echoTestSuiteEnd(testCount, started);
+
+            LOGGER.info("Start waiting");
+            Thread.sleep(60000);
+            LOGGER.info("Completed waiting");
         } finally {
             int runningWorkerCount = componentRegistry.workerCount();
             echo("Terminating %d Workers...", runningWorkerCount);
