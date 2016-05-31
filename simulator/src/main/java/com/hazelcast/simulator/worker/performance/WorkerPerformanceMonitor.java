@@ -113,11 +113,18 @@ public class WorkerPerformanceMonitor {
         public void run() {
             while (!shutdown.get()) {
                 long startedNanos = System.nanoTime();
+
                 long currentTimestamp = System.currentTimeMillis();
 
-                boolean runningTestContainerFound = updatePerformanceStates(currentTimestamp);
+                boolean runningTestContainerFound = updateTestDataMap(currentTimestamp);
+
+                updatePerformanceStates(currentTimestamp);
+
                 sendPerformanceStates();
+
                 writeStatsToFiles(currentTimestamp);
+
+                cleanupTestDataMap(currentTimestamp);
 
                 long elapsedNanos = System.nanoTime() - startedNanos;
                 if (intervalNanos > elapsedNanos) {
@@ -131,7 +138,7 @@ public class WorkerPerformanceMonitor {
                 }
             }
             sendTestHistograms();
-            LOGGER.info("Counted:"+counted);
+            LOGGER.info("Counted:" + counted);
         }
 
         private void sendTestHistograms() {
@@ -147,7 +154,7 @@ public class WorkerPerformanceMonitor {
             }
         }
 
-        private boolean updatePerformanceStates(long currentTimestamp) {
+        private boolean updateTestDataMap(long currentTimestamp) {
             boolean runningTestContainerFound = false;
 
             for (TestContainer testContainer : testContainers) {
@@ -160,16 +167,22 @@ public class WorkerPerformanceMonitor {
                 runningTestContainerFound = true;
             }
 
+            return runningTestContainerFound;
+        }
+
+        private void updatePerformanceStates(long currentTimestamp) {
             for (TestData testData : testDataMap.values()) {
                 updatePerformanceStates(currentTimestamp, testData);
+            }
+        }
 
-                // discard the testData if it isn't seen in the current run.
+        private void cleanupTestDataMap(long currentTimestamp) {
+            for (TestData testData : testDataMap.values()) {
+                // cleanupTestDataMap the testData if it isn't seen in the current run.
                 if (testData.lastSeen != currentTimestamp) {
                     testDataMap.remove(testData.testId);
                 }
             }
-
-            return runningTestContainerFound;
         }
 
         private void updatePerformanceStates(long currentTimestamp, TestData testData) {
@@ -224,7 +237,7 @@ public class WorkerPerformanceMonitor {
 
             counted.addAndGet(intervalOperationalCount);
 
-            System.out.println("Total"+counted+" delta:"+intervalOperationalCount);
+            System.out.println("Total:" + counted + " delta:" + intervalOperationalCount);
 
             testData.tracker.update(intervalHistograms, intervalPercentileLatency, intervalAvgLatency, intervalMaxLatency,
                     intervalOperationalCount, currentTimestamp);
