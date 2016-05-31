@@ -15,6 +15,8 @@
  */
 package com.hazelcast.simulator.worker.performance;
 
+import org.apache.log4j.Logger;
+
 import static java.lang.Math.max;
 
 /**
@@ -23,6 +25,7 @@ import static java.lang.Math.max;
  * Has methods to combine {@link PerformanceState} instances by adding or setting maximum values.
  */
 public class PerformanceState {
+    private static final Logger LOGGER = Logger.getLogger(PerformanceState.class);
 
     public static final double INTERVAL_LATENCY_PERCENTILE = 99.9;
 
@@ -119,6 +122,8 @@ public class PerformanceState {
             intervalPercentileLatency = max(intervalPercentileLatency, other.intervalPercentileLatency);
             intervalMaxLatency = max(intervalMaxLatency, other.intervalMaxLatency);
         }
+
+        LOGGER.info(System.identityHashCode(this) + " total=" + operationCount + " delta:" + other.operationCount);
     }
 
     /**

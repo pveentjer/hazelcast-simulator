@@ -224,6 +224,8 @@ public class WorkerPerformanceMonitor {
 
             counted.addAndGet(intervalOperationalCount);
 
+            System.out.println("Total"+counted+" delta:"+intervalOperationalCount);
+
             testData.tracker.update(intervalHistograms, intervalPercentileLatency, intervalAvgLatency, intervalMaxLatency,
                     intervalOperationalCount, currentTimestamp);
         }
