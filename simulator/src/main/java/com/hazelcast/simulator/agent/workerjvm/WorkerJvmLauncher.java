@@ -112,7 +112,7 @@ public class WorkerJvmLauncher {
 
         Map<String, String> environment = processBuilder.environment();
         String javaHome = getJavaHome();
-        String path = javaHome + File.pathSeparator + "bin:" + environment.get("PATH");
+        String path = javaHome + "/bin:" + environment.get("PATH");
         environment.put("PATH", path);
         environment.put("JAVA_HOME", javaHome);
 

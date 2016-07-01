@@ -1,0 +1,1 @@
+log4j:WARN No appenders could be found for logger (com.hazelcast.simulator.worker.IntegrationTestWorker).

@@ -10,6 +10,9 @@
 exec > worker.out
 exec 2>worker.err
 
+echo PATH=$PATH
+echo JAVA_HOME=$JAVA_HOME
+
 JVM_ARGS="-XX:OnOutOfMemoryError=\"touch;-9;worker.oome\" \
           -Dhazelcast.logging.type=log4j \
           -Dlog4j.configuration=file:@LOG4J_FILE \
@@ -33,7 +36,7 @@ MAIN=
 case "@WORKER_TYPE" in
     CLIENT )        MAIN=com.hazelcast.simulator.worker.ClientWorker;;
     MEMBER )        MAIN=com.hazelcast.simulator.worker.MemberWorker;;
-    INTEGRATION )   MAIN=com.hazelcast.simulator.worker.IntegrationTestWorker;;
+    INTEGRATION_TEST )   MAIN=com.hazelcast.simulator.worker.IntegrationTestWorker;;
 esac
 
 java -classpath ${CLASSPATH} ${JVM_ARGS} ${MAIN}
