@@ -15,42 +15,32 @@
  */
 package com.hazelcast.simulator.tests.syntheticmap;
 
-import com.hazelcast.simulator.probes.Probe;
-import com.hazelcast.simulator.test.TestRunner;
-import com.hazelcast.simulator.test.annotations.RunWithWorker;
+import com.hazelcast.simulator.test.BaseWorkerContext;
 import com.hazelcast.simulator.test.annotations.Setup;
 import com.hazelcast.simulator.test.annotations.Teardown;
+import com.hazelcast.simulator.test.annotations.TimeStep;
 import com.hazelcast.simulator.test.annotations.Warmup;
 import com.hazelcast.simulator.tests.AbstractTest;
 import com.hazelcast.simulator.tests.helpers.KeyLocality;
-import com.hazelcast.simulator.worker.selector.OperationSelectorBuilder;
-import com.hazelcast.simulator.worker.tasks.AbstractWorkerWithMultipleProbes;
 
 import java.util.Random;
 
-import static com.hazelcast.simulator.tests.helpers.HazelcastTestUtils.getOperationCountInformation;
 import static com.hazelcast.simulator.tests.helpers.HazelcastTestUtils.waitClusterSize;
+import static com.hazelcast.simulator.tests.helpers.KeyLocality.SHARED;
 import static com.hazelcast.simulator.tests.helpers.KeyUtils.generateStringKeys;
 import static com.hazelcast.simulator.utils.GeneratorUtils.generateStrings;
 
 public class StringStringSyntheticMapTest extends AbstractTest {
-
-    private enum Operation {
-        PUT,
-        GET
-    }
 
     // properties
     public int keyLength = 10;
     public int valueLength = 10;
     public int keyCount = 10000;
     public int valueCount = 10000;
-    public KeyLocality keyLocality = KeyLocality.SHARED;
+    public KeyLocality keyLocality = SHARED;
     public int minNumberOfMembers = 0;
 
     public double putProb = 0.1;
-
-    private final OperationSelectorBuilder<Operation> operationSelectorBuilder = new OperationSelectorBuilder<Operation>();
 
     private SyntheticMap<String, String> map;
 
@@ -60,16 +50,11 @@ public class StringStringSyntheticMapTest extends AbstractTest {
     @Setup
     public void setUp() {
         map = targetInstance.getDistributedObject(SyntheticMapService.SERVICE_NAME, "map-" + basename);
-
-        operationSelectorBuilder
-                .addOperation(Operation.PUT, putProb)
-                .addDefaultOperation(Operation.GET);
     }
 
     @Teardown
     public void tearDown() {
         map.destroy();
-        logger.info(getOperationCountInformation(targetInstance));
     }
 
     @Warmup
@@ -85,39 +70,17 @@ public class StringStringSyntheticMapTest extends AbstractTest {
         }
     }
 
-    @RunWithWorker
-    public Worker createWorker() {
-        return new Worker();
+    @TimeStep
+    public void put(WorkerContext context) {
+        map.put(context.randomKey(), context.randomValue());
     }
 
-    private class Worker extends AbstractWorkerWithMultipleProbes<Operation> {
+    @TimeStep
+    public void get(WorkerContext context) {
+        map.get(context.randomKey());
+    }
 
-        public Worker() {
-            super(operationSelectorBuilder);
-        }
-
-        @Override
-        protected void timeStep(Operation operation, Probe probe) throws Exception {
-            String key = randomKey();
-            long started;
-
-            switch (operation) {
-                case PUT:
-                    String value = randomValue();
-                    started = System.nanoTime();
-                    map.put(key, value);
-                    probe.done(started);
-                    break;
-                case GET:
-                    started = System.nanoTime();
-                    map.get(key);
-                    probe.done(started);
-                    break;
-                default:
-                    throw new UnsupportedOperationException();
-            }
-        }
-
+    private class WorkerContext extends BaseWorkerContext {
         private String randomKey() {
             return keys[randomInt(keys.length)];
         }
@@ -125,10 +88,5 @@ public class StringStringSyntheticMapTest extends AbstractTest {
         private String randomValue() {
             return values[randomInt(values.length)];
         }
-    }
-
-    public static void main(String[] args) throws Exception {
-        StringStringSyntheticMapTest test = new StringStringSyntheticMapTest();
-        new TestRunner<StringStringSyntheticMapTest>(test).run();
     }
 }

@@ -17,19 +17,16 @@ package com.hazelcast.simulator.tests.map;
 
 import com.hazelcast.core.IMap;
 import com.hazelcast.query.TruePredicate;
-import com.hazelcast.simulator.test.TestRunner;
-import com.hazelcast.simulator.test.annotations.RunWithWorker;
 import com.hazelcast.simulator.test.annotations.Setup;
 import com.hazelcast.simulator.test.annotations.Teardown;
+import com.hazelcast.simulator.test.annotations.TimeStep;
 import com.hazelcast.simulator.test.annotations.Warmup;
 import com.hazelcast.simulator.tests.AbstractTest;
 import com.hazelcast.simulator.worker.loadsupport.Streamer;
 import com.hazelcast.simulator.worker.loadsupport.StreamerFactory;
-import com.hazelcast.simulator.worker.tasks.AbstractMonotonicWorker;
 
 import java.util.Set;
 
-import static com.hazelcast.simulator.tests.helpers.HazelcastTestUtils.getOperationCountInformation;
 import static com.hazelcast.simulator.utils.GeneratorUtils.generateString;
 import static org.junit.Assert.assertEquals;
 
@@ -58,7 +55,6 @@ public class AllKeySetTest extends AbstractTest {
     @Teardown
     public void teardown() {
         map.destroy();
-        logger.info(getOperationCountInformation(targetInstance));
     }
 
     @Warmup(global = true)
@@ -72,28 +68,15 @@ public class AllKeySetTest extends AbstractTest {
         streamer.await();
     }
 
-    @RunWithWorker
-    public Worker createWorker() {
-        return new Worker();
-    }
-
-    private class Worker extends AbstractMonotonicWorker {
-
-        @Override
-        protected void timeStep() throws Exception {
-            Set<String> result;
-            if (usePredicate) {
-                result = map.keySet(TruePredicate.INSTANCE);
-            } else {
-                result = map.keySet();
-            }
-
-            assertEquals(entryCount, result.size());
+    @TimeStep
+    public void timestep() {
+        Set<String> result;
+        if (usePredicate) {
+            result = map.keySet(TruePredicate.INSTANCE);
+        } else {
+            result = map.keySet();
         }
-    }
 
-    public static void main(String[] args) throws Exception {
-        AllKeySetTest test = new AllKeySetTest();
-        new TestRunner<AllKeySetTest>(test).withDuration(10).run();
+        assertEquals(entryCount, result.size());
     }
 }

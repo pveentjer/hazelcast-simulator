@@ -17,12 +17,13 @@ package com.hazelcast.simulator.tests.map;
 
 import com.hazelcast.core.IList;
 import com.hazelcast.core.IMap;
-import com.hazelcast.simulator.test.annotations.RunWithWorker;
+import com.hazelcast.simulator.test.BaseWorkerContext;
+import com.hazelcast.simulator.test.annotations.AfterRun;
 import com.hazelcast.simulator.test.annotations.Setup;
+import com.hazelcast.simulator.test.annotations.TimeStep;
 import com.hazelcast.simulator.test.annotations.Verify;
 import com.hazelcast.simulator.test.annotations.Warmup;
 import com.hazelcast.simulator.tests.AbstractTest;
-import com.hazelcast.simulator.worker.tasks.AbstractMonotonicWorker;
 
 import static java.lang.String.format;
 import static org.junit.Assert.assertEquals;
@@ -76,32 +77,27 @@ public class MapLockTest extends AbstractTest {
                 failures);
     }
 
-    @RunWithWorker
-    public Worker createWorker() {
-        return new Worker();
+    @TimeStep
+    public void timeStep(WorkerContext context) {
+        int key = context.randomInt(keyCount);
+        long increment = context.randomInt(100);
+
+        map.lock(key);
+        try {
+            Long current = map.get(key);
+            map.put(key, current + increment);
+            context.increments[key] += increment;
+        } finally {
+            map.unlock(key);
+        }
     }
 
-    private class Worker extends AbstractMonotonicWorker {
+    @AfterRun
+    public void afterRun(WorkerContext context) {
+        incrementsList.add(context.increments);
+    }
+
+    private class WorkerContext extends BaseWorkerContext {
         private final long[] increments = new long[keyCount];
-
-        @Override
-        public void timeStep() {
-            int key = randomInt(keyCount);
-            long increment = randomInt(100);
-
-            map.lock(key);
-            try {
-                Long current = map.get(key);
-                map.put(key, current + increment);
-                increments[key] += increment;
-            } finally {
-                map.unlock(key);
-            }
-        }
-
-        @Override
-        public void afterRun() {
-            incrementsList.add(increments);
-        }
     }
 }

@@ -16,14 +16,14 @@
 package com.hazelcast.simulator.tests.map;
 
 import com.hazelcast.core.IMap;
-import com.hazelcast.simulator.test.TestRunner;
-import com.hazelcast.simulator.test.annotations.RunWithWorker;
+import com.hazelcast.simulator.test.BaseWorkerContext;
+import com.hazelcast.simulator.test.annotations.AfterRun;
 import com.hazelcast.simulator.test.annotations.Setup;
 import com.hazelcast.simulator.test.annotations.Teardown;
+import com.hazelcast.simulator.test.annotations.TimeStep;
 import com.hazelcast.simulator.test.annotations.Verify;
 import com.hazelcast.simulator.test.annotations.Warmup;
 import com.hazelcast.simulator.tests.AbstractTest;
-import com.hazelcast.simulator.worker.tasks.AbstractMonotonicWorker;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -83,42 +83,31 @@ public class MapRaceTest extends AbstractTest {
         assertEquals("There should not be any data races", 0, failures);
     }
 
-    @RunWithWorker
-    public Worker createWorker() {
-        return new Worker();
+    @TimeStep
+    public void timeStep(WorkerContext context) {
+        Integer key = context.randomInt(keyCount);
+        long increment = context.randomInt(100);
+
+        context.incrementMap(map, key, increment);
+        context.incrementMap(context.result, key, increment);
     }
 
-    private class Worker extends AbstractMonotonicWorker {
+    @AfterRun
+    public void afterRun(WorkerContext context) {
+        resultMap.put(newSecureUuidString(), context.result);
+    }
+
+    private class WorkerContext extends BaseWorkerContext {
         private final Map<Integer, Long> result = new HashMap<Integer, Long>();
 
-        @Override
-        public void beforeRun() {
+        WorkerContext() {
             for (int i = 0; i < keyCount; i++) {
                 result.put(i, 0L);
             }
         }
 
-        @Override
-        public void timeStep() {
-            Integer key = randomInt(keyCount);
-            long increment = randomInt(100);
-
-            incrementMap(map, key, increment);
-            incrementMap(result, key, increment);
-        }
-
-        @Override
-        public void afterRun() {
-            resultMap.put(newSecureUuidString(), result);
-        }
-
         private void incrementMap(Map<Integer, Long> map, Integer key, long increment) {
             map.put(key, map.get(key) + increment);
         }
-    }
-
-    public static void main(String[] args) throws Exception {
-        MapRaceTest test = new MapRaceTest();
-        new TestRunner<MapRaceTest>(test).run();
     }
 }

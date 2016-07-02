@@ -45,10 +45,12 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static com.hazelcast.simulator.test.ThrowingRunnable.NO_OP;
 import static com.hazelcast.simulator.utils.AnnotationReflectionUtils.getAtMostOneMethodWithoutArgs;
 import static com.hazelcast.simulator.utils.AnnotationReflectionUtils.getAtMostOneVoidMethodSkipArgsCheck;
 import static com.hazelcast.simulator.utils.AnnotationReflectionUtils.getAtMostOneVoidMethodWithoutArgs;
@@ -71,7 +73,7 @@ import static org.apache.commons.lang3.text.WordUtils.capitalizeFully;
 
 /**
  * Container for test class instances.
- *
+ * <p>
  * <ul>
  * <li>Creates the test class instance by its fully qualified class name.</li>
  * <li>Binds properties to the test class instance (test parameters).</li>
@@ -102,18 +104,24 @@ public class TestContainer {
     private static final Logger LOGGER = Logger.getLogger(TestContainer.class);
 
     private final Map<String, Probe> probeMap = new ConcurrentHashMap<String, Probe>();
-    private final Map<TestPhase, Method> testMethods = new HashMap<TestPhase, Method>();
 
     private final TestContext testContext;
     private final Object testClassInstance;
     private final Class testClassType;
+
+    private ThrowingRunnable setupTask = NO_OP;
+    private ThrowingRunnable localWarmup = NO_OP;
+    private ThrowingRunnable globalWarmup = NO_OP;
+    private ThrowingRunnable runTask = NO_OP;
+    private ThrowingRunnable localVerifyTask = NO_OP;
+    private ThrowingRunnable globalVerifyTask = NO_OP;
+    private ThrowingRunnable tearDownTask = NO_OP;
 
     private final int runWithWorkerThreadCount;
     private final int runWithWorkerMetronomeInterval;
     private final MetronomeType runWithWorkerMetronomeType;
     private final boolean runWithWorkerIsLightweightProbe;
 
-    private boolean runWithWorker;
     private Object[] setupArguments;
 
     private long testStartedTimestamp;
@@ -185,6 +193,19 @@ public class TestContainer {
     }
 
     public void invoke(TestPhase testPhase) throws Exception {
+        switch (testPhase){
+            case SETUP:
+                setupTask.run();
+                break;
+            case LOCAL_WARMUP:
+                localWarmup.run();
+                break;
+            case GLOBAL_WARMUP:
+                globalWarmup.run();;
+                break;
+            case
+        }
+
         switch (testPhase) {
             case RUN:
                 invokeRun();
@@ -213,11 +234,16 @@ public class TestContainer {
         try {
             runMethod = getAtMostOneVoidMethodWithoutArgs(testClassType, Run.class);
             runWithWorkerMethod = getAtMostOneMethodWithoutArgs(testClassType, RunWithWorker.class, IWorker.class);
+
+
+
             if (runWithWorkerMethod != null) {
                 runWithWorker = true;
                 testMethods.put(TestPhase.RUN, runWithWorkerMethod);
-            } else {
+            } else if (runMethod != null) {
                 testMethods.put(TestPhase.RUN, runMethod);
+            } else {
+                testMethods.put(TestPhase.RUN, )
             }
 
             Method setupMethod = getAtMostOneVoidMethodSkipArgsCheck(testClassType, Setup.class);
@@ -237,9 +263,9 @@ public class TestContainer {
         } catch (Exception e) {
             throw new IllegalTestException("Error during search for annotated test methods in" + testClassType.getName(), e);
         }
-        if ((runMethod == null) == (runWithWorkerMethod == null)) {
-            throw new IllegalTestException(format("Test must contain either %s or %s method", Run.class, RunWithWorker.class));
-        }
+//        if ((runMethod == null) == (runWithWorkerMethod == null)) {
+//            throw new IllegalTestException(format("Test must contain either %s or %s method", Run.class, RunWithWorker.class));
+//        }
     }
 
     private Object[] getSetupArguments(Method setupMethod) {
@@ -269,7 +295,7 @@ public class TestContainer {
         try {
             Method method = testMethods.get(TestPhase.RUN);
             if (runWithWorker) {
-                invokeRunWithWorkerMethod(method);
+                runWithRunAnnotation(method);
             } else {
                 testStartedTimestamp = System.currentTimeMillis();
                 isRunning = true;
@@ -280,7 +306,7 @@ public class TestContainer {
         }
     }
 
-    private void invokeRunWithWorkerMethod(Method runMethod) throws Exception {
+    private void runWithRunAnnotation(Method runMethod) throws Exception {
         LOGGER.info(format("Spawning %d worker threads for test %s", runWithWorkerThreadCount, testContext.getTestId()));
         if (runWithWorkerThreadCount <= 0) {
             return;
@@ -288,6 +314,30 @@ public class TestContainer {
 
         // create instance to get the class of the IWorker implementation
         IWorker workerInstance = invokeMethod(testClassInstance, runMethod);
+        Class<? extends IWorker> workerClass = workerInstance.getClass();
+
+        Map<Field, Object> injectMap = createInjectMap(workerClass);
+        Map<Enum, Probe> operationProbeMap = createOperationProbeMap(workerClass, workerInstance);
+
+        // everything is prepared, we can notify the outside world now
+        testStartedTimestamp = System.currentTimeMillis();
+        isRunning = true;
+
+        // spawn workers and wait for completion
+        IWorker worker = runWorkers(runWithWorkerThreadCount, runMethod, injectMap, operationProbeMap);
+
+        // call the afterCompletion() method on a single instance of the worker
+        worker.afterCompletion();
+    }
+
+    private void invokeTimestepMethod() throws Exception {
+        LOGGER.info(format("Spawning %d worker threads for test %s", runWithWorkerThreadCount, testContext.getTestId()));
+        if (runWithWorkerThreadCount <= 0) {
+            return;
+        }
+
+        // create instance to get the class of the IWorker implementation
+         workerInstance = invokeMethod(testClassInstance, runMethod);
         Class<? extends IWorker> workerClass = workerInstance.getClass();
 
         Map<Field, Object> injectMap = createInjectMap(workerClass);

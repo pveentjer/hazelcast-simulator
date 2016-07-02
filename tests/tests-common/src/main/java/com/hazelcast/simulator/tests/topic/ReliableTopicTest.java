@@ -23,15 +23,16 @@ import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.DataSerializableFactory;
 import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
+import com.hazelcast.simulator.test.BaseWorkerContext;
 import com.hazelcast.simulator.test.TestException;
-import com.hazelcast.simulator.test.annotations.RunWithWorker;
 import com.hazelcast.simulator.test.annotations.Setup;
+import com.hazelcast.simulator.test.annotations.TimeStep;
 import com.hazelcast.simulator.test.annotations.Verify;
 import com.hazelcast.simulator.tests.AbstractTest;
 import com.hazelcast.simulator.tests.helpers.KeyLocality;
 import com.hazelcast.simulator.utils.AssertTask;
 import com.hazelcast.simulator.utils.ExceptionReporter;
-import com.hazelcast.simulator.worker.tasks.AbstractMonotonicWorker;
+import org.junit.After;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -44,6 +45,7 @@ import static com.hazelcast.simulator.tests.helpers.KeyUtils.generateStringKeys;
 import static com.hazelcast.simulator.utils.TestUtils.assertTrueEventually;
 import static com.hazelcast.simulator.utils.UuidUtil.newSecureUuidString;
 import static java.lang.String.format;
+import static org.bouncycastle.asn1.x509.X509ObjectIdentifiers.id;
 import static org.junit.Assert.assertEquals;
 
 public class ReliableTopicTest extends AbstractTest {
@@ -80,8 +82,8 @@ public class ReliableTopicTest extends AbstractTest {
         }
     }
 
-    @Verify(global = true)
-    public void verify() {
+    @Verify
+    public void globalVerify() {
         final long expectedCount = listenersPerTopic * totalMessagesSend.get();
         assertTrueEventually(new AssertTask() {
             @Override
@@ -96,39 +98,33 @@ public class ReliableTopicTest extends AbstractTest {
         assertEquals("Failures found", 0, failures.get());
     }
 
-    @RunWithWorker
-    public Worker createWorker() {
-        return new Worker();
+    @TimeStep
+    public void timestemp(WorkerContext context) {
+        ITopic<MessageEntity> topic = context.randomTopic();
+        AtomicLong counter = context.counterMap.get(topic);
+        MessageEntity msg = new MessageEntity(context.id, counter.incrementAndGet());
+        context.messagesSend++;
+        topic.publish(msg);
     }
 
-    private class Worker extends AbstractMonotonicWorker {
+    @After
+    public void afterRun(WorkerContext context){
+        totalMessagesSend.addAndGet(context.messagesSend);
+    }
+
+    private class WorkerContext extends BaseWorkerContext {
 
         private long messagesSend = 0;
-
         private final Map<ITopic, AtomicLong> counterMap = new HashMap<ITopic, AtomicLong>();
         private final String id = newSecureUuidString();
 
-        public Worker() {
+        public WorkerContext() {
             for (ITopic topic : topics) {
                 counterMap.put(topic, new AtomicLong());
             }
         }
 
-        @Override
-        protected void timeStep() throws Exception {
-            ITopic<MessageEntity> topic = getRandomTopic();
-            AtomicLong counter = counterMap.get(topic);
-            MessageEntity msg = new MessageEntity(id, counter.incrementAndGet());
-            messagesSend++;
-            topic.publish(msg);
-        }
-
-        @Override
-        public void afterRun() {
-            totalMessagesSend.addAndGet(messagesSend);
-        }
-
-        private ITopic<MessageEntity> getRandomTopic() {
+        private ITopic<MessageEntity> randomTopic() {
             int index = randomInt(topics.length);
             return topics[index];
         }
@@ -225,9 +221,7 @@ public class ReliableTopicTest extends AbstractTest {
 
         @Override
         public String toString() {
-            return "StressMessageListener{"
-                    + "id=" + id
-                    + '}';
+            return "StressMessageListener{" + "id=" + id + '}';
         }
     }
 }

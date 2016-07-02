@@ -16,16 +16,16 @@
 package com.hazelcast.simulator.tests.icache;
 
 import com.hazelcast.core.IList;
-import com.hazelcast.simulator.test.TestRunner;
-import com.hazelcast.simulator.test.annotations.RunWithWorker;
+import com.hazelcast.simulator.test.BaseWorkerContext;
+import com.hazelcast.simulator.test.annotations.AfterRun;
 import com.hazelcast.simulator.test.annotations.Setup;
 import com.hazelcast.simulator.test.annotations.Teardown;
+import com.hazelcast.simulator.test.annotations.TimeStep;
 import com.hazelcast.simulator.test.annotations.Verify;
 import com.hazelcast.simulator.test.annotations.Warmup;
 import com.hazelcast.simulator.tests.AbstractTest;
 import com.hazelcast.simulator.worker.loadsupport.Streamer;
 import com.hazelcast.simulator.worker.loadsupport.StreamerFactory;
-import com.hazelcast.simulator.worker.tasks.AbstractMonotonicWorker;
 
 import javax.cache.Cache;
 import javax.cache.CacheManager;
@@ -71,6 +71,25 @@ public class CasICacheTest extends AbstractTest {
         streamer.await();
     }
 
+    @TimeStep
+    public void timeStep(WorkerContext context) {
+        int key = context.randomInt(keyCount);
+        long increment = context.randomInt(100);
+
+        while (true) {
+            Long current = cache.get(key);
+            if (cache.replace(key, current, current + increment)) {
+                context.increments[key] += increment;
+                break;
+            }
+        }
+    }
+
+    @AfterRun
+    public void afterRun(WorkerContext context) {
+        resultsPerWorker.add(context.increments);
+    }
+
     @Verify
     public void verify() {
         long[] amount = new long[keyCount];
@@ -91,37 +110,9 @@ public class CasICacheTest extends AbstractTest {
         assertEquals(failures + " key=>values have been incremented unExpected", 0, failures);
     }
 
-    @RunWithWorker
-    public Worker createWorker() {
-        return new Worker();
-    }
 
-    private class Worker extends AbstractMonotonicWorker {
-
+    private class WorkerContext extends BaseWorkerContext {
         private final long[] increments = new long[keyCount];
-
-        @Override
-        public void timeStep() {
-            int key = randomInt(keyCount);
-            long increment = randomInt(100);
-
-            while (true) {
-                Long current = cache.get(key);
-                if (cache.replace(key, current, current + increment)) {
-                    increments[key] += increment;
-                    break;
-                }
-            }
-        }
-
-        @Override
-        public void afterRun() {
-            resultsPerWorker.add(increments);
-        }
     }
 
-    public static void main(String[] args) throws Exception {
-        CasICacheTest test = new CasICacheTest();
-        new TestRunner<CasICacheTest>(test).run();
-    }
 }

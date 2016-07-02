@@ -19,14 +19,14 @@ import com.hazelcast.core.IAtomicLong;
 import com.hazelcast.core.ITopic;
 import com.hazelcast.core.Message;
 import com.hazelcast.core.MessageListener;
-import com.hazelcast.simulator.test.TestRunner;
-import com.hazelcast.simulator.test.annotations.RunWithWorker;
+import com.hazelcast.simulator.test.BaseWorkerContext;
+import com.hazelcast.simulator.test.annotations.AfterRun;
 import com.hazelcast.simulator.test.annotations.Setup;
 import com.hazelcast.simulator.test.annotations.Teardown;
+import com.hazelcast.simulator.test.annotations.TimeStep;
 import com.hazelcast.simulator.test.annotations.Verify;
 import com.hazelcast.simulator.tests.AbstractTest;
 import com.hazelcast.simulator.utils.AssertTask;
-import com.hazelcast.simulator.worker.tasks.AbstractMonotonicWorker;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -86,8 +86,8 @@ public class ITopicTest extends AbstractTest {
         totalFoundCounter.destroy();
     }
 
-    @Verify(global = true)
-    public void verify() {
+    @Verify
+    public void globalVerify() {
         if (maxVerificationTimeSeconds < 0) {
             return;
         }
@@ -105,39 +105,34 @@ public class ITopicTest extends AbstractTest {
         }, maxVerificationTimeSeconds);
     }
 
-    @RunWithWorker
-    public Worker createWorker() {
-        return new Worker();
+    @TimeStep
+    public void timestep(WorkerContext context) {
+        sleepRandomNanos(context.getRandom(), maxPublicationDelayNanos);
+
+        long msg = context.nextMessage();
+        context.count += msg;
+
+        ITopic<Long> topic = context.randomTopic();
+        topic.publish(msg);
     }
 
-    private class Worker extends AbstractMonotonicWorker {
+    @AfterRun
+    public void afterRun(WorkerContext context) {
+        totalExpectedCounter.addAndGet(context.count);
+    }
+
+    private class WorkerContext extends BaseWorkerContext {
 
         private long count;
 
-        @Override
-        public void timeStep() {
-            sleepRandomNanos(getRandom(), maxPublicationDelayNanos);
-
-            long msg = nextMessage();
-            count += msg;
-
-            ITopic<Long> topic = getRandomTopic();
-            topic.publish(msg);
-        }
-
-        @Override
-        public void afterRun() {
-            totalExpectedCounter.addAndGet(count);
-        }
-
         @SuppressWarnings("unchecked")
-        private ITopic<Long> getRandomTopic() {
+        private ITopic<Long> randomTopic() {
             int index = randomInt(topics.length);
             return (ITopic<Long>) topics[index];
         }
 
         private long nextMessage() {
-            long msg = getRandom().nextLong() % 1000;
+            long msg = randomLong() % 1000;//what is the point of getting a long when doing a mod?
             return (msg < 0) ? -msg : msg;
         }
     }
@@ -153,10 +148,5 @@ public class ITopicTest extends AbstractTest {
             sleepRandomNanos(random, maxProcessingDelayNanos);
             count += message.getMessageObject();
         }
-    }
-
-    public static void main(String[] args) throws Exception {
-        ITopicTest test = new ITopicTest();
-        new TestRunner<ITopicTest>(test).withDuration(10).run();
     }
 }

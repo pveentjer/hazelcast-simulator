@@ -16,15 +16,14 @@
 package com.hazelcast.simulator.tests.map;
 
 import com.hazelcast.core.IMap;
-import com.hazelcast.simulator.test.TestRunner;
-import com.hazelcast.simulator.test.annotations.RunWithWorker;
+import com.hazelcast.simulator.test.BaseWorkerContext;
 import com.hazelcast.simulator.test.annotations.Setup;
 import com.hazelcast.simulator.test.annotations.Teardown;
+import com.hazelcast.simulator.test.annotations.TimeStep;
 import com.hazelcast.simulator.test.annotations.Warmup;
 import com.hazelcast.simulator.tests.AbstractTest;
 import com.hazelcast.simulator.tests.helpers.GenericTypes;
 import com.hazelcast.simulator.tests.helpers.KeyLocality;
-import com.hazelcast.simulator.worker.tasks.AbstractMonotonicWorker;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -72,7 +71,6 @@ public class MapPutAllTest extends AbstractTest {
     @Teardown
     public void tearDown() {
         map.destroy();
-        logger.info(getOperationCountInformation(targetInstance));
 
         if (valueType == GenericTypes.INTEGER) {
             valueSize = Integer.MAX_VALUE;
@@ -98,32 +96,22 @@ public class MapPutAllTest extends AbstractTest {
         }
     }
 
-    @RunWithWorker
-    public Worker createWorker() {
-        return new Worker();
-    }
-
-    private class Worker extends AbstractMonotonicWorker {
-
-        @Override
-        protected void timeStep() throws Exception {
-            Map<Object, Object> insertMap = randomMap();
-            if (usePutAll) {
-                map.putAll(insertMap);
-            } else {
-                for (Map.Entry<Object, Object> entry : insertMap.entrySet()) {
-                    map.put(entry.getKey(), entry.getValue());
-                }
+    @TimeStep
+    public void timeStep(WorkerContext context) {
+        Map<Object, Object> insertMap = context.randomMap();
+        if (usePutAll) {
+            map.putAll(insertMap);
+        } else {
+            for (Map.Entry<Object, Object> entry : insertMap.entrySet()) {
+                map.put(entry.getKey(), entry.getValue());
             }
         }
+    }
 
+    private class WorkerContext extends BaseWorkerContext {
         private Map<Object, Object> randomMap() {
             return inputMaps[randomInt(inputMaps.length)];
         }
     }
 
-    public static void main(String[] args) throws Exception {
-        MapPutAllTest test = new MapPutAllTest();
-        new TestRunner<MapPutAllTest>(test).withDuration(10).run();
-    }
 }

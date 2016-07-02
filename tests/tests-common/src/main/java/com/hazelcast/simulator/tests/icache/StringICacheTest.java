@@ -15,18 +15,15 @@
  */
 package com.hazelcast.simulator.tests.icache;
 
-import com.hazelcast.simulator.probes.Probe;
-import com.hazelcast.simulator.test.TestRunner;
-import com.hazelcast.simulator.test.annotations.RunWithWorker;
+import com.hazelcast.simulator.test.BaseWorkerContext;
 import com.hazelcast.simulator.test.annotations.Setup;
 import com.hazelcast.simulator.test.annotations.Teardown;
+import com.hazelcast.simulator.test.annotations.TimeStep;
 import com.hazelcast.simulator.test.annotations.Warmup;
 import com.hazelcast.simulator.tests.AbstractTest;
 import com.hazelcast.simulator.tests.helpers.KeyLocality;
 import com.hazelcast.simulator.worker.loadsupport.Streamer;
 import com.hazelcast.simulator.worker.loadsupport.StreamerFactory;
-import com.hazelcast.simulator.worker.selector.OperationSelectorBuilder;
-import com.hazelcast.simulator.worker.tasks.AbstractWorkerWithMultipleProbes;
 
 import javax.cache.Cache;
 import javax.cache.CacheManager;
@@ -39,11 +36,6 @@ import static com.hazelcast.simulator.utils.GeneratorUtils.generateStrings;
 
 public class StringICacheTest extends AbstractTest {
 
-    private enum Operation {
-        PUT,
-        GET
-    }
-
     // properties
     public int keyLength = 10;
     public int valueLength = 10;
@@ -55,8 +47,6 @@ public class StringICacheTest extends AbstractTest {
     public int minNumberOfMembers = 0;
     public double putProb = 0.1;
 
-    private final OperationSelectorBuilder<Operation> operationSelectorBuilder = new OperationSelectorBuilder<Operation>();
-
     private Cache<String, String> cache;
     private String[] keys;
     private String[] values;
@@ -65,9 +55,6 @@ public class StringICacheTest extends AbstractTest {
     public void setup() {
         CacheManager cacheManager = createCacheManager(targetInstance);
         cache = cacheManager.getCache(basename);
-
-        operationSelectorBuilder.addOperation(Operation.PUT, putProb)
-                .addDefaultOperation(Operation.GET);
     }
 
     @Teardown
@@ -91,42 +78,22 @@ public class StringICacheTest extends AbstractTest {
         streamer.await();
     }
 
-    @RunWithWorker
-    public Worker createWorker() {
-        return new Worker();
+    @TimeStep
+    public void put(WorkerContext context) {
+        cache.put(context.randomKey(), context.randomValue());
     }
 
-    private class Worker extends AbstractWorkerWithMultipleProbes<Operation> {
+    @TimeStep
+    public void get(WorkerContext context) {
+        cache.get(context.randomKey());
+    }
 
-        public Worker() {
-            super(operationSelectorBuilder);
-        }
+    @TimeStep
+    public void getAndPut(WorkerContext context) {
+        cache.getAndPut(context.randomKey(), context.randomValue());
+    }
 
-        @Override
-        public void timeStep(Operation operation, Probe probe) {
-            String key = randomKey();
-            long started;
-
-            switch (operation) {
-                case PUT:
-                    String value = randomValue();
-                    started = System.nanoTime();
-                    if (useGetAndPut) {
-                        cache.getAndPut(key, value);
-                    } else {
-                        cache.put(key, value);
-                    }
-                    probe.done(started);
-                    break;
-                case GET:
-                    started = System.nanoTime();
-                    cache.get(key);
-                    probe.done(started);
-                    break;
-                default:
-                    throw new UnsupportedOperationException();
-            }
-        }
+    private class WorkerContext extends BaseWorkerContext {
 
         private String randomValue() {
             return values[randomInt(values.length)];
@@ -136,10 +103,5 @@ public class StringICacheTest extends AbstractTest {
             int length = keys.length;
             return keys[randomInt(length)];
         }
-    }
-
-    public static void main(String[] args) throws Exception {
-        StringICacheTest test = new StringICacheTest();
-        new TestRunner<StringICacheTest>(test).run();
     }
 }
