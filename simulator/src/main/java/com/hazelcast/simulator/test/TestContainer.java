@@ -45,12 +45,11 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.hazelcast.simulator.test.ThrowingRunnable.NO_OP;
+import static com.hazelcast.simulator.test.TestPhase.LOCAL_WARMUP;
 import static com.hazelcast.simulator.utils.AnnotationReflectionUtils.getAtMostOneMethodWithoutArgs;
 import static com.hazelcast.simulator.utils.AnnotationReflectionUtils.getAtMostOneVoidMethodSkipArgsCheck;
 import static com.hazelcast.simulator.utils.AnnotationReflectionUtils.getAtMostOneVoidMethodWithoutArgs;
@@ -106,26 +105,18 @@ public class TestContainer {
     private final Map<String, Probe> probeMap = new ConcurrentHashMap<String, Probe>();
 
     private final TestContext testContext;
-    private final Object testClassInstance;
+    private final Object testInstance;
     private final Class testClassType;
-
-    private ThrowingRunnable setupTask = NO_OP;
-    private ThrowingRunnable localWarmup = NO_OP;
-    private ThrowingRunnable globalWarmup = NO_OP;
-    private ThrowingRunnable runTask = NO_OP;
-    private ThrowingRunnable localVerifyTask = NO_OP;
-    private ThrowingRunnable globalVerifyTask = NO_OP;
-    private ThrowingRunnable tearDownTask = NO_OP;
 
     private final int runWithWorkerThreadCount;
     private final int runWithWorkerMetronomeInterval;
     private final MetronomeType runWithWorkerMetronomeType;
     private final boolean runWithWorkerIsLightweightProbe;
 
-    private Object[] setupArguments;
-
     private long testStartedTimestamp;
     private volatile boolean isRunning;
+
+    private final Map<TestPhase, ThrowingRunnable> taskPerPhaseMap = new HashMap<TestPhase, ThrowingRunnable>();
 
     public TestContainer(TestContext testContext, TestCase testCase) {
         this(testContext, getTestClassInstance(testCase), getThreadCount(testCase),
@@ -133,47 +124,48 @@ public class TestContainer {
                 isLightweightProbe(testCase));
     }
 
-    public TestContainer(TestContext testContext, Object testClassInstance) {
-        this(testContext, testClassInstance, DEFAULT_RUN_WITH_WORKER_THREAD_COUNT,
+    public TestContainer(TestContext testContext, Object testInstance) {
+        this(testContext, testInstance, DEFAULT_RUN_WITH_WORKER_THREAD_COUNT,
                 DEFAULT_RUN_WITH_WORKER_METRONOME_INTERVAL, DEFAULT_RUN_WITH_WORKER_METRONOME_TYPE, DEFAULT_IS_LIGHTWEIGHT_PROBE);
     }
 
-    public TestContainer(TestContext testContext, Object testClassInstance, boolean runWithWorkerIsLightweightProbe) {
-        this(testContext, testClassInstance, DEFAULT_RUN_WITH_WORKER_THREAD_COUNT,
+    public TestContainer(TestContext testContext, Object testInstance, boolean runWithWorkerIsLightweightProbe) {
+        this(testContext, testInstance, DEFAULT_RUN_WITH_WORKER_THREAD_COUNT,
                 DEFAULT_RUN_WITH_WORKER_METRONOME_INTERVAL, DEFAULT_RUN_WITH_WORKER_METRONOME_TYPE,
                 runWithWorkerIsLightweightProbe);
     }
 
-    public TestContainer(TestContext testContext, Object testClassInstance, int runWithWorkerThreadCount) {
-        this(testContext, testClassInstance, runWithWorkerThreadCount,
+    public TestContainer(TestContext testContext, Object testInstance, int runWithWorkerThreadCount) {
+        this(testContext, testInstance, runWithWorkerThreadCount,
                 DEFAULT_RUN_WITH_WORKER_METRONOME_INTERVAL, DEFAULT_RUN_WITH_WORKER_METRONOME_TYPE, DEFAULT_IS_LIGHTWEIGHT_PROBE);
     }
 
-    public TestContainer(TestContext testContext, Object testClassInstance, int runWithWorkerThreadCount,
+    public TestContainer(TestContext testContext, Object testInstance, int runWithWorkerThreadCount,
                          int runWithWorkerMetronomeInterval, MetronomeType runWithWorkerMetronomeType,
                          boolean runWithWorkerIsLightweightProbe) {
         if (testContext == null) {
             throw new NullPointerException("testContext cannot be null!");
         }
-        if (testClassInstance == null) {
-            throw new NullPointerException("testClassInstance cannot be null!");
+        if (testInstance == null) {
+            throw new NullPointerException("testInstance cannot be null!");
         }
 
         this.testContext = testContext;
-        this.testClassInstance = testClassInstance;
-        this.testClassType = testClassInstance.getClass();
+        this.testInstance = testInstance;
+        this.testClassType = testInstance.getClass();
 
         this.runWithWorkerThreadCount = runWithWorkerThreadCount;
         this.runWithWorkerMetronomeInterval = runWithWorkerMetronomeInterval;
         this.runWithWorkerMetronomeType = runWithWorkerMetronomeType;
         this.runWithWorkerIsLightweightProbe = runWithWorkerIsLightweightProbe;
 
+
         injectDependencies();
         initTestMethods();
     }
 
     public Object getTestInstance() {
-        return testClassInstance;
+        return testInstance;
     }
 
     public TestContext getTestContext() {
@@ -193,28 +185,9 @@ public class TestContainer {
     }
 
     public void invoke(TestPhase testPhase) throws Exception {
-        switch (testPhase){
-            case SETUP:
-                setupTask.run();
-                break;
-            case LOCAL_WARMUP:
-                localWarmup.run();
-                break;
-            case GLOBAL_WARMUP:
-                globalWarmup.run();;
-                break;
-            case
-        }
-
-        switch (testPhase) {
-            case RUN:
-                invokeRun();
-                break;
-            case SETUP:
-                invokeMethod(testClassInstance, testMethods.get(TestPhase.SETUP), setupArguments);
-                break;
-            default:
-                invokeMethod(testClassInstance, testMethods.get(testPhase));
+        ThrowingRunnable task = taskPerPhaseMap.get(testPhase);
+        if (task != null) {
+            task.run();
         }
     }
 
@@ -225,16 +198,58 @@ public class TestContainer {
 
     private void injectDependencies() {
         Map<Field, Object> injectMap = createInjectMap(testClassType);
-        injectObjects(injectMap, testClassInstance);
+        injectObjects(injectMap, testInstance);
     }
 
     private void initTestMethods() {
+        final Method setupMethod = getAtMostOneVoidMethodSkipArgsCheck(testClassType, Setup.class);
+        if (setupMethod != null) {
+            setupTask = new ThrowingRunnable() {
+                @Override
+                public void run() throws Exception {
+                    setupMethod.invoke()
+                }
+            }
+            setupArguments = getSetupArguments(setupMethod);
+            testMethods.put(TestPhase.SETUP, setupMethod);
+        }
+
+        Method localWarmupMethod = getAtMostOneVoidMethodWithoutArgs(testClassType, Warmup.class, new WarmupFilter(false));
+        if (localWarmupMethod != null) {
+            taskPerPhaseMap.put(LOCAL_WARMUP, new InvokingCallable(testInstance, localWarmupMethod))
+        }
+
+        Method globalWarmupMethod = getAtMostOneVoidMethodWithoutArgs(testClassType, Warmup.class, new WarmupFilter(true));
+        if (localWarmupMethod != null) {
+            globalWarmupTask = new InvokingCallable(testInstance, globalWarmupMethod);
+        }
+
+        Method localVerifyMethod = getAtMostOneVoidMethodWithoutArgs(testClassType, Verify.class, new VerifyFilter(false));
+        if (localVerifyMethod != null) {
+            localVerifyTask = new InvokingCallable(testInstance, localVerifyMethod);
+        }
+
+        Method globalVerifyMethod = getAtMostOneVoidMethodWithoutArgs(testClassType, Verify.class, new VerifyFilter(true));
+        if (globalVerifyMethod != null) {
+            globalVerifyTask = new InvokingCallable(testInstance, globalVerifyMethod);
+        }
+
+
+        Method localTearDownMethod = getAtMostOneVoidMethodWithoutArgs(testClassType, Verify.class, new TeardownFilter(false));
+        if (localTearDownMethod != null) {
+            localTearDownTask = new InvokingCallable(testInstance, localTearDownMethod);
+        }
+
+        Method globalTeardownMethod = getAtMostOneVoidMethodWithoutArgs(testClassType, Verify.class, new TeardownFilter(true));
+        if (globalTeardownMethod != null) {
+            globalTearDownTask = new InvokingCallable(testInstance, globalTeardownMethod);
+        }
+
         Method runMethod;
         Method runWithWorkerMethod;
         try {
             runMethod = getAtMostOneVoidMethodWithoutArgs(testClassType, Run.class);
             runWithWorkerMethod = getAtMostOneMethodWithoutArgs(testClassType, RunWithWorker.class, IWorker.class);
-
 
 
             if (runWithWorkerMethod != null) {
@@ -246,20 +261,15 @@ public class TestContainer {
                 testMethods.put(TestPhase.RUN, )
             }
 
-            Method setupMethod = getAtMostOneVoidMethodSkipArgsCheck(testClassType, Setup.class);
-            if (setupMethod != null) {
-                setupArguments = getSetupArguments(setupMethod);
-                testMethods.put(TestPhase.SETUP, setupMethod);
-            }
 
-            setTestMethod(Warmup.class, new WarmupFilter(false), TestPhase.LOCAL_WARMUP);
-            setTestMethod(Warmup.class, new WarmupFilter(true), TestPhase.GLOBAL_WARMUP);
+            extractTestMethod(Warmup.class, new WarmupFilter(false), TestPhase.LOCAL_WARMUP);
+            extractTestMethod(Warmup.class, new WarmupFilter(true), TestPhase.GLOBAL_WARMUP);
 
-            setTestMethod(Verify.class, new VerifyFilter(false), TestPhase.LOCAL_VERIFY);
-            setTestMethod(Verify.class, new VerifyFilter(true), TestPhase.GLOBAL_VERIFY);
+            extractTestMethod(Verify.class, new VerifyFilter(false), TestPhase.LOCAL_VERIFY);
+            extractTestMethod(Verify.class, new VerifyFilter(true), TestPhase.GLOBAL_VERIFY);
 
-            setTestMethod(Teardown.class, new TeardownFilter(false), TestPhase.LOCAL_TEARDOWN);
-            setTestMethod(Teardown.class, new TeardownFilter(true), TestPhase.GLOBAL_TEARDOWN);
+            extractTestMethod(Teardown.class, new TeardownFilter(false), TestPhase.LOCAL_TEARDOWN);
+            extractTestMethod(Teardown.class, new TeardownFilter(true), TestPhase.GLOBAL_TEARDOWN);
         } catch (Exception e) {
             throw new IllegalTestException("Error during search for annotated test methods in" + testClassType.getName(), e);
         }
@@ -286,7 +296,7 @@ public class TestContainer {
         return arguments;
     }
 
-    private void setTestMethod(Class<? extends Annotation> annotationClass, AnnotationFilter filter, TestPhase testPhase) {
+    private void extractTestMethod(Class<? extends Annotation> annotationClass, AnnotationFilter filter, TestPhase testPhase) {
         Method method = getAtMostOneVoidMethodWithoutArgs(testClassType, annotationClass, filter);
         testMethods.put(testPhase, method);
     }
@@ -299,7 +309,7 @@ public class TestContainer {
             } else {
                 testStartedTimestamp = System.currentTimeMillis();
                 isRunning = true;
-                invokeMethod(testClassInstance, method);
+                invokeMethod(testInstance, method);
             }
         } finally {
             isRunning = false;
@@ -313,7 +323,7 @@ public class TestContainer {
         }
 
         // create instance to get the class of the IWorker implementation
-        IWorker workerInstance = invokeMethod(testClassInstance, runMethod);
+        IWorker workerInstance = invokeMethod(testInstance, runMethod);
         Class<? extends IWorker> workerClass = workerInstance.getClass();
 
         Map<Field, Object> injectMap = createInjectMap(workerClass);
@@ -337,7 +347,7 @@ public class TestContainer {
         }
 
         // create instance to get the class of the IWorker implementation
-         workerInstance = invokeMethod(testClassInstance, runMethod);
+        workerInstance = invokeMethod(testInstance, runMethod);
         Class<? extends IWorker> workerClass = workerInstance.getClass();
 
         Map<Field, Object> injectMap = createInjectMap(workerClass);
@@ -413,7 +423,7 @@ public class TestContainer {
         IWorker firstWorker = null;
         ThreadSpawner spawner = new ThreadSpawner(testContext.getTestId());
         for (int i = 0; i < threadCount; i++) {
-            final IWorker worker = invokeMethod(testClassInstance, runMethod);
+            final IWorker worker = invokeMethod(testInstance, runMethod);
             if (firstWorker == null) {
                 firstWorker = worker;
             }
