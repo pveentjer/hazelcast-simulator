@@ -109,6 +109,10 @@ final class CoordinatorCli {
                     + " Use ';' as separator for multiple entries. The wildcard '*' can also be used.")
             .withRequiredArg().ofType(String.class);
 
+    private final OptionSpec<String> outputSpec = parser.accepts("output",
+            "The directory where the output is stored")
+            .withRequiredArg().ofType(String.class).defaultsTo(System.getProperty("user.dir"));
+
     private final OptionSpec<String> testSuiteIdSpec = parser.accepts("testSuiteId",
             "Defines the ID of the TestSuite. If not set the actual date will be used.")
             .withRequiredArg().ofType(String.class);
@@ -293,6 +297,7 @@ final class CoordinatorCli {
         testSuite.setWaitForTestCase(hasWaitForTestCase);
         testSuite.setFailFast(options.valueOf(cli.failFastSpec));
         testSuite.setTolerableFailures(fromPropertyValue(options.valueOf(cli.tolerableFailureSpec)));
+        testSuite.setOutputDirectory(options.valueOf(cli.outputSpec));
         return testSuite;
     }
 

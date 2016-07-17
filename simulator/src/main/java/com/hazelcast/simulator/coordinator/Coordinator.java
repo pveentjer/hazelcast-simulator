@@ -30,6 +30,7 @@ import com.hazelcast.simulator.test.TestPhase;
 import com.hazelcast.simulator.test.TestSuite;
 import com.hazelcast.simulator.utils.Bash;
 import com.hazelcast.simulator.utils.CommandLineExitException;
+import com.hazelcast.simulator.utils.FileUtils;
 import com.hazelcast.simulator.utils.ThreadSpawner;
 import com.hazelcast.simulator.utils.jars.HazelcastJARs;
 import org.apache.log4j.Logger;
@@ -92,7 +93,7 @@ public final class Coordinator {
 
     private RemoteClient remoteClient;
     private CoordinatorConnector coordinatorConnector;
-    private final File outputDirectory = new File(System.getProperty("user.dir"));
+    private final File outputDirectory;
 
     public Coordinator(TestSuite testSuite, ComponentRegistry componentRegistry, CoordinatorParameters coordinatorParameters,
                        WorkerParameters workerParameters, ClusterLayoutParameters clusterLayoutParameters) {
@@ -100,8 +101,14 @@ public final class Coordinator {
                 new ClusterLayout(componentRegistry, workerParameters, clusterLayoutParameters));
     }
 
-    Coordinator(TestSuite testSuite, ComponentRegistry componentRegistry, CoordinatorParameters coordinatorParameters,
-                WorkerParameters workerParameters, ClusterLayoutParameters clusterLayoutParameters, ClusterLayout clusterLayout) {
+    Coordinator(TestSuite testSuite,
+                ComponentRegistry componentRegistry,
+                CoordinatorParameters coordinatorParameters,
+                WorkerParameters workerParameters,
+                ClusterLayoutParameters clusterLayoutParameters,
+                ClusterLayout clusterLayout) {
+
+        this.outputDirectory = FileUtils.ensureExistingDirectory(testSuite.getOutputDirectory());
         this.testSuite = testSuite;
         this.componentRegistry = componentRegistry;
         this.coordinatorParameters = coordinatorParameters;

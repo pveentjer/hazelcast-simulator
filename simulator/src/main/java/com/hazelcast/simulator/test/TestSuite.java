@@ -45,6 +45,7 @@ public class TestSuite {
     private int durationSeconds;
     private boolean waitForTestCase;
     private boolean failFast;
+    private String outputDirectory;
 
     private Set<FailureType> tolerableFailures = Collections.emptySet();
 
@@ -62,6 +63,14 @@ public class TestSuite {
 
     public List<TestCase> getTestCaseList() {
         return testCaseList;
+    }
+
+    public String getOutputDirectory() {
+        return outputDirectory;
+    }
+
+    public void setOutputDirectory(String outputDirectory) {
+        this.outputDirectory = outputDirectory;
     }
 
     public void setDurationSeconds(int durationSeconds) {
