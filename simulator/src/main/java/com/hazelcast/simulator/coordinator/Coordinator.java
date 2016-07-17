@@ -108,7 +108,8 @@ public final class Coordinator {
         this.workerParameters = workerParameters;
         this.clusterLayoutParameters = clusterLayoutParameters;
         this.hdrHistogramContainer = new HdrHistogramContainer(outputDirectory, performanceStateContainer);
-        this.failureContainer = new FailureContainer(testSuite, componentRegistry);
+        this.failureContainer = new FailureContainer(
+                outputDirectory, testSuite.getId(), componentRegistry, testSuite.getTolerableFailures());
 
         this.simulatorProperties = coordinatorParameters.getSimulatorProperties();
         this.bash = new Bash(simulatorProperties);

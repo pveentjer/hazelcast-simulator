@@ -11,6 +11,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.File;
 import java.util.Set;
 
 import static com.hazelcast.simulator.test.FailureType.WORKER_EXCEPTION;
@@ -19,6 +20,7 @@ import static com.hazelcast.simulator.test.FailureType.WORKER_OOM;
 import static com.hazelcast.simulator.test.FailureType.WORKER_TIMEOUT;
 import static com.hazelcast.simulator.utils.CommonUtils.sleepSeconds;
 import static com.hazelcast.simulator.utils.FileUtils.deleteQuiet;
+import static com.hazelcast.simulator.utils.TestUtils.createTmpDirectory;
 import static java.util.Collections.singleton;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -30,15 +32,19 @@ public class FailureContainerTest {
     private final static int FINISHED_WORKER_TIMEOUT_SECONDS = 120;
 
     private ComponentRegistry componentRegistry = mock(ComponentRegistry.class);
-    private FailureContainer failureContainer = new FailureContainer("testSuite", componentRegistry, singleton(WORKER_TIMEOUT));
+    private FailureContainer failureContainer;
 
     private FailureOperation exceptionOperation;
     private FailureOperation oomOperation;
     private FailureOperation finishedOperation;
     private FailureOperation nonCriticalOperation;
+    private File outputDirectory;
 
     @Before
     public void setUp() {
+        outputDirectory = createTmpDirectory();
+        failureContainer = new FailureContainer(outputDirectory, "testSuite", componentRegistry, singleton(WORKER_TIMEOUT));
+
         SimulatorAddress workerAddress = new SimulatorAddress(AddressLevel.WORKER, 1, 1, 0);
         String agentAddress = workerAddress.getParent().toString();
 
@@ -57,7 +63,7 @@ public class FailureContainerTest {
 
     @After
     public void tearDown() {
-        deleteQuiet("failures-testSuite.txt");
+        deleteQuiet(outputDirectory);
     }
 
     @Test
@@ -102,7 +108,7 @@ public class FailureContainerTest {
     @Test
     public void testHasCriticalFailure_withNonCriticalFailures() {
         Set<FailureType> nonCriticalFailures = singleton(exceptionOperation.getType());
-        failureContainer = new FailureContainer("testSuite", componentRegistry, nonCriticalFailures);
+        failureContainer = new FailureContainer(createTmpDirectory(), "testSuite", componentRegistry, nonCriticalFailures);
 
         failureContainer.addFailureOperation(exceptionOperation);
         assertFalse(failureContainer.hasCriticalFailure());
