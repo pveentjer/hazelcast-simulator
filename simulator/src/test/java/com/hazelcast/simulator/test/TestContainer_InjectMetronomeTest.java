@@ -2,15 +2,18 @@ package com.hazelcast.simulator.test;
 
 import com.hazelcast.simulator.test.annotations.InjectMetronome;
 import com.hazelcast.simulator.test.annotations.RunWithWorker;
+import com.hazelcast.simulator.worker.metronome.EmptyMetronome;
 import com.hazelcast.simulator.worker.metronome.Metronome;
+import com.hazelcast.simulator.worker.metronome.SleepingMetronome;
 import com.hazelcast.simulator.worker.tasks.AbstractMonotonicWorker;
 import org.junit.Test;
 
-import static com.hazelcast.simulator.worker.metronome.MetronomeType.NOP;
+import static com.hazelcast.simulator.TestSupport.assertInstanceOf;
 import static com.hazelcast.simulator.worker.metronome.MetronomeType.SLEEPING;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class TestContainer_InjectMetronomeTest extends AbstractTestContainerTest {
 
@@ -23,13 +26,15 @@ public class TestContainer_InjectMetronomeTest extends AbstractTestContainerTest
                 .setProperty("metronomeType", SLEEPING.name());
 
         testContainer = new TestContainer(testContext, testCase);
+        MetronomeTest testInstance = (MetronomeTest) testContainer.getTestInstance();
+        SleepingMetronome metronome = assertInstanceOf(SleepingMetronome.class, testInstance.metronome);
+
+        assertEquals(100, metronome.getIntervalMillis());
+
         testContainer.invoke(TestPhase.SETUP);
         testContainer.invoke(TestPhase.RUN);
 
-        MetronomeTest metronomeTest = (MetronomeTest) testContainer.getTestInstance();
-        assertNotNull(metronomeTest.workerMetronome);
-        assertEquals(100, metronomeTest.workerMetronome.getInterval());
-        assertEquals(SLEEPING, metronomeTest.workerMetronome.getType());
+        assertNotNull(metronome);
     }
 
     @Test
@@ -38,8 +43,8 @@ public class TestContainer_InjectMetronomeTest extends AbstractTestContainerTest
         testContainer = createTestContainer(test);
 
         assertNotNull(test.metronome);
-        assertEquals(0, test.metronome.getInterval());
-        assertEquals(NOP, test.metronome.getType());
+        Metronome metronome = test.metronome;
+        assertTrue(metronome instanceof EmptyMetronome);
     }
 
 

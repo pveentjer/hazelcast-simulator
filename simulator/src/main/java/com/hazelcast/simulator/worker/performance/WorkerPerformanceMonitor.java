@@ -61,7 +61,7 @@ public class WorkerPerformanceMonitor {
         thread.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(Thread t, Throwable e) {
-                LOGGER.fatal(e);
+                LOGGER.fatal(e.getMessage(), e);
             }
         });
     }
@@ -80,11 +80,11 @@ public class WorkerPerformanceMonitor {
 
     /**
      * Thread to monitor the performance of Simulator Tests.
-     *
+     * <p>
      * Iterates over all {@link TestContainer} to retrieve performance values from all {@link Probe} instances.
      * Sends performance numbers as {@link PerformanceState} to the Coordinator.
      * Writes performance stats to files.
-     *
+     * <p>
      * Holds one {@link TestPerformanceTracker} instance per Simulator Test.
      */
     private final class WorkerPerformanceMonitorThread extends Thread {
