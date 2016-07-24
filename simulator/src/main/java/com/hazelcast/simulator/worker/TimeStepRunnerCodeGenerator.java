@@ -18,6 +18,7 @@ package com.hazelcast.simulator.worker;
 
 import com.hazelcast.simulator.probes.Probe;
 import com.hazelcast.simulator.test.IllegalTestException;
+import com.hazelcast.simulator.worker.metronome.EmptyMetronome;
 import com.hazelcast.simulator.worker.metronome.Metronome;
 import freemarker.ext.util.WrapperTemplateModel;
 import freemarker.template.Configuration;
@@ -116,7 +117,7 @@ class TimeStepRunnerCodeGenerator {
 
             Map<String, Object> root = new HashMap<String, Object>();
             root.put("testInstanceClass", getClassName(timeStepModel.getTestClass()));
-            root.put("metronomeClass", getClassName(metronomeClass));
+            root.put("metronomeClass", getMetronomeClass(metronomeClass));
             root.put("timeStepMethods", timeStepModel.getActiveTimeStepMethods());
             root.put("probeClass", getClassName(probeClass));
             root.put("isAssignableFrom", new IsAssignableFromMethod());
@@ -138,6 +139,13 @@ class TimeStepRunnerCodeGenerator {
         } catch (Exception e) {
             throw new IllegalTestException(e);
         }
+    }
+
+    private static String getMetronomeClass(Class<? extends Metronome> metronomeClass) {
+        if (metronomeClass == EmptyMetronome.class) {
+            return null;
+        }
+        return getClassName(metronomeClass);
     }
 
     private static class JavaSourceFromString extends SimpleJavaFileObject {

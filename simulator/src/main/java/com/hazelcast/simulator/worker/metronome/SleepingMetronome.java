@@ -30,7 +30,6 @@ public final class SleepingMetronome implements Metronome {
 
     private final long intervalNanos;
     private final boolean accountForCoordinatedOmission;
-
     private long nextNanos;
 
     public SleepingMetronome(long intervalNanos, boolean accountForCoordinatedOmission) {

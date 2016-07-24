@@ -59,10 +59,11 @@ import static java.lang.String.format;
 public class PropertyBinding {
 
     // properties
-    public int metronomeIntervalUs;
+    public int intervalUs;
     public MetronomeType metronomeType = SLEEPING;
     public boolean accountForCoordinatedOmission = true;
-
+    // if we want to measure latency. Normally this is always true; but in its current setting, hdr can cause contention
+    // and I want a switch that turns of hdr recording. Perhaps that with some tuning this isn't needed.
     public boolean measureLatency = true;
 
     private final Class<? extends Probe> probeClass;
@@ -161,7 +162,7 @@ public class PropertyBinding {
 
     private Class<? extends Metronome> loadMetronomeClass() {
         metronomeBuilder
-                .withIntervalUs(metronomeIntervalUs)
+                .withIntervalUs(intervalUs)
                 .withAccountForCoordinatedOmission(accountForCoordinatedOmission)
                 .withMetronomeType(metronomeType);
 

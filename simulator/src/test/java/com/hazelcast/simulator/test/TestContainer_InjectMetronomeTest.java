@@ -22,7 +22,7 @@ public class TestContainer_InjectMetronomeTest extends AbstractTestContainerTest
         TestCase testCase = new TestCase("TestContainerMetronomeTest")
                 .setProperty("class", MetronomeTest.class.getName())
                 .setProperty("threadCount", 1)
-                .setProperty("metronomeIntervalUs", 100000)
+                .setProperty("intervalUs", 100000)
                 .setProperty("metronomeType", SLEEPING.name());
 
         testContainer = new TestContainer(testContext, testCase);
