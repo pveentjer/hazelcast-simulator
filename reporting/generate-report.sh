@@ -32,6 +32,7 @@ image_height=720
 # - the aggregated per member hdr-history file has only a single item
 # - time in the hdr file; should be expressed in micro's instead of milli's with a comma?
 
+
 # DONE
 # - hdr history file only has 1 item
 # - hdr history file doesn't have timestamp set correctly
@@ -286,6 +287,9 @@ html_latency(){
 
     html_title "Latency"
     html_img "images/latency.png"
+
+
+
 }
 
 plot_dstat_probe(){
