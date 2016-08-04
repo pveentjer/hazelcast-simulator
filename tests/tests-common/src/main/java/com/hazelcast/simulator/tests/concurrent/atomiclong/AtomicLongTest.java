@@ -52,14 +52,16 @@ public class AtomicLongTest extends AbstractTest {
     }
 
      @TimeStep(prob = -1)
-    public void get(ThreadState state) {
-        state.randomCounter().get();
+    public long get(ThreadState state) {
+         IAtomicLong counter = state.randomCounter();
+         return counter.get();
     }
 
     @TimeStep(prob = 0.1)
-    public void write(ThreadState state) {
-        state.randomCounter().incrementAndGet();
+    public long write(ThreadState state) {
+        IAtomicLong counter = state.randomCounter();
         state.increments++;
+        return counter.incrementAndGet();
     }
 
     public class ThreadState extends BaseThreadState {

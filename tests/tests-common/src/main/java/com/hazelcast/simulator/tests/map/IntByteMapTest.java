@@ -72,8 +72,8 @@ public class IntByteMapTest extends AbstractTest {
     }
 
     @TimeStep(prob = 0.1)
-    public void put(ThreadState state) {
-        map.put(state.randomKey(), state.randomValue());
+    public Object put(ThreadState state) {
+        return map.put(state.randomKey(), state.randomValue());
     }
 
     @TimeStep(prob = 0.0)
@@ -82,8 +82,8 @@ public class IntByteMapTest extends AbstractTest {
     }
 
     @TimeStep(prob = -1)
-    public void get(ThreadState state) {
-        map.get(state.randomKey());
+    public Object get(ThreadState state) {
+        return map.get(state.randomKey());
     }
 
     public class ThreadState extends BaseThreadState {

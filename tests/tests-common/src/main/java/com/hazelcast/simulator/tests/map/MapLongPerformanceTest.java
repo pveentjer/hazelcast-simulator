@@ -50,13 +50,12 @@ public class MapLongPerformanceTest extends AbstractTest {
     public void put(BaseThreadState state) {
         int key = state.randomInt(keyCount);
         map.set(key, System.currentTimeMillis());
-
     }
 
     @TimeStep(prob = -1)
-    public void get(BaseThreadState state) {
+    public Long get(BaseThreadState state) {
         int key = state.randomInt(keyCount);
-        map.get(key);
+        return map.get(key);
     }
 
     @Teardown

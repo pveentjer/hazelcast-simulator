@@ -72,16 +72,16 @@ public class StringStringMapTest extends AbstractTest {
     }
 
     @TimeStep(prob = -1)
-    public void get(ThreadState state) {
+    public String get(ThreadState state) {
         String key = state.randomKey();
-        map.get(key);
+        return map.get(key);
     }
 
     @TimeStep(prob = 0.1)
-    public void put(ThreadState state) {
+    public String put(ThreadState state) {
         String key = state.randomKey();
         String value = state.randomValue();
-        map.put(key, value);
+        return map.put(key, value);
     }
 
     @TimeStep(prob = 0)

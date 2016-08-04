@@ -71,15 +71,15 @@ public class AtomicReferenceTest extends AbstractTest {
 
     @TimeStep(prob = 1)
     public void put(ThreadState state) {
-        IAtomicReference<Object> counter = state.getRandomCounter();
+        IAtomicReference<Object> reference = state.getRandomCounter();
         Object value = values[state.randomInt(values.length)];
-        counter.set(value);
+        reference.set(value);
     }
 
     @TimeStep(prob = -1)
-    public void get(ThreadState state) {
-        IAtomicReference<Object> counter = state.getRandomCounter();
-        counter.get();
+    public Object get(ThreadState state) {
+        IAtomicReference<Object> reference = state.getRandomCounter();
+        return reference.get();
     }
 
     public class ThreadState extends BaseThreadState {
