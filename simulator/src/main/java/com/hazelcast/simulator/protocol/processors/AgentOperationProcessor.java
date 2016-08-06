@@ -76,12 +76,6 @@ public class AgentOperationProcessor extends OperationProcessor {
                 break;
             case CREATE_WORKER:
                 return processCreateWorker((CreateWorkerOperation) operation);
-            case START_TIMEOUT_DETECTION:
-                processStartTimeoutDetection();
-                break;
-            case STOP_TIMEOUT_DETECTION:
-                processStopTimeoutDetection();
-                break;
             default:
                 return UNSUPPORTED_OPERATION_ON_THIS_PROCESSOR;
         }

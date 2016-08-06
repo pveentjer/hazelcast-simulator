@@ -100,10 +100,6 @@ public class WorkerProcess {
         this.lastSeen = System.currentTimeMillis();
     }
 
-    public void setLastSeen(long timeStamp) {
-        this.lastSeen = timeStamp;
-    }
-
     public boolean isOomeDetected() {
         return oomeDetected;
     }
@@ -122,10 +118,6 @@ public class WorkerProcess {
 
     public Process getProcess() {
         return process;
-    }
-
-    public void setProcess(Process process) {
-        this.process = process;
     }
 
     public String getHazelcastAddress() {
@@ -147,7 +139,7 @@ public class WorkerProcess {
 
             waitForStartup();
         } catch (Exception e) {
-            throw new StartWorkerFailedException("Failed to start Worker", e);
+            throw new WorkerProcessFailedToStartException("Failed to start Worker", e);
         }
     }
 
@@ -169,7 +161,6 @@ public class WorkerProcess {
         log4jFile = ensureExistingFile(workerHome, "log4j.xml");
         writeText(workerProcessSettings.getLog4jConfig(), log4jFile);
 
-
         generateWorkerStartScript();
 
         ProcessBuilder processBuilder = new ProcessBuilder(new String[]{"bash", "worker.sh"})
@@ -190,7 +181,7 @@ public class WorkerProcess {
         int loopCount = (int) SECONDS.toMillis(workerStartupTimeout) / WAIT_FOR_WORKER_STARTUP_INTERVAL_MILLIS;
         for (int i = 0; i < loopCount; i++) {
             if (hasExited()) {
-                throw new StartWorkerFailedException(format(
+                throw new WorkerProcessFailedToStartException(format(
                         "Startup of Worker %s on Agent %s failed, check log files in %s for more information!",
                         address, agent.getPublicAddress(), workerHome));
             }
@@ -205,7 +196,7 @@ public class WorkerProcess {
             sleepMillis(WAIT_FOR_WORKER_STARTUP_INTERVAL_MILLIS);
         }
 
-        throw new StartWorkerFailedException(format(
+        throw new WorkerProcessFailedToStartException(format(
                 "Worker %s on Agent %s didn't start within %s seconds, check log files in %s for more information!",
                 address, agent.getPublicAddress(), workerStartupTimeout, workerHome));
     }

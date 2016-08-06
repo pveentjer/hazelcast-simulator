@@ -39,8 +39,6 @@ public enum OperationType {
     // AgentOperationProcessor
     INIT_TEST_SUITE(InitTestSuiteOperation.class, 8),
     CREATE_WORKER(CreateWorkerOperation.class, 9),
-    START_TIMEOUT_DETECTION(StartTimeoutDetectionOperation.class, 10),
-    STOP_TIMEOUT_DETECTION(StopTimeoutDetectionOperation.class, 11),
 
     // WorkerOperationProcessor
     PING(PingOperation.class, 12),

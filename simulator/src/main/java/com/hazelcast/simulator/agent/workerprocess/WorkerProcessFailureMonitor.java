@@ -15,19 +15,11 @@
  */
 package com.hazelcast.simulator.agent.workerprocess;
 
-import com.hazelcast.simulator.agent.Agent;
-import com.hazelcast.simulator.protocol.connector.AgentConnector;
-import com.hazelcast.simulator.protocol.core.Response;
-import com.hazelcast.simulator.protocol.core.ResponseType;
-import com.hazelcast.simulator.protocol.core.SimulatorAddress;
-import com.hazelcast.simulator.protocol.core.SimulatorProtocolException;
-import com.hazelcast.simulator.protocol.operation.FailureOperation;
-import com.hazelcast.simulator.test.FailureType;
 import org.apache.log4j.Logger;
 
 import java.io.File;
 import java.io.FilenameFilter;
-import java.util.concurrent.TimeUnit;
+import java.util.Date;
 
 import static com.hazelcast.simulator.test.FailureType.WORKER_EXCEPTION;
 import static com.hazelcast.simulator.test.FailureType.WORKER_EXIT;
@@ -40,28 +32,23 @@ import static com.hazelcast.simulator.utils.FileUtils.fileAsText;
 import static com.hazelcast.simulator.utils.FileUtils.rename;
 import static com.hazelcast.simulator.utils.FormatUtils.NEW_LINE;
 import static java.lang.String.format;
-import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 
 public class WorkerProcessFailureMonitor {
 
-    private static final int DEFAULT_CHECK_INTERVAL_MILLIS = (int) SECONDS.toMillis(1);
-
     private static final Logger LOGGER = Logger.getLogger(WorkerProcessFailureMonitor.class);
 
     private final MonitorThread monitorThread;
+    private final WorkerProcessFailureSender failureListener;
 
-    private int failureCount;
-
-    public WorkerProcessFailureMonitor(Agent agent, WorkerProcessManager workerProcessManager, int lastSeenTimeoutSeconds) {
-        this(agent, workerProcessManager, lastSeenTimeoutSeconds, DEFAULT_CHECK_INTERVAL_MILLIS);
-    }
-
-    WorkerProcessFailureMonitor(Agent agent,
-                                WorkerProcessManager workerProcessManager,
-                                int lastSeenTimeoutSeconds,
-                                int checkIntervalMillis) {
-        monitorThread = new MonitorThread(agent, workerProcessManager, lastSeenTimeoutSeconds, checkIntervalMillis);
+    public WorkerProcessFailureMonitor(
+            WorkerProcessFailureSender failureSender,
+            WorkerProcessManager processManager,
+            int lastSeenTimeoutSeconds,
+            int scanIntervalMillis) {
+        this.failureListener = failureSender;
+        this.monitorThread = new MonitorThread(processManager, lastSeenTimeoutSeconds, scanIntervalMillis);
     }
 
     public void start() {
@@ -90,36 +77,36 @@ public class WorkerProcessFailureMonitor {
 
     private final class MonitorThread extends Thread {
 
-        private final Agent agent;
         private final WorkerProcessManager workerProcessManager;
         private final int lastSeenTimeoutSeconds;
-        private final int checkIntervalMillis;
+        private final int scanIntervalMillis;
 
         private volatile boolean running = true;
         private volatile boolean detectTimeouts;
 
-        private MonitorThread(Agent agent, WorkerProcessManager workerProcessManager, int lastSeenTimeoutSeconds,
-                              int checkIntervalMillis) {
+        private MonitorThread(WorkerProcessManager workerProcessManager, int lastSeenTimeoutSeconds,
+                              int scanIntervalMillis) {
             super("WorkerJvmFailureMonitorThread");
             setDaemon(true);
 
-            this.agent = agent;
             this.workerProcessManager = workerProcessManager;
             this.lastSeenTimeoutSeconds = lastSeenTimeoutSeconds;
-            this.checkIntervalMillis = checkIntervalMillis;
+            this.scanIntervalMillis = scanIntervalMillis;
         }
 
         @Override
         public void run() {
             while (running) {
-                try {
-                    for (WorkerProcess workerProcess : workerProcessManager.getWorkerProcesses()) {
+                for (WorkerProcess workerProcess : workerProcessManager.getWorkerProcesses()) {
+                    //System.out.println("lastSeen:" + new Date(workerProcess.getLastSeen()));
+                    try {
                         detectFailures(workerProcess);
+                    } catch (Exception e) {
+                        LOGGER.fatal("Failed to scan for failures", e);
                     }
-                } catch (Exception e) {
-                    LOGGER.fatal("Failed to scan for failures", e);
                 }
-                sleepMillis(checkIntervalMillis);
+
+                sleepMillis(scanIntervalMillis);
             }
         }
 
@@ -163,7 +150,7 @@ public class WorkerProcessFailureMonitor {
                 }
 
                 // we delete or rename the exception file so that we don't detect the same exception again
-                boolean send = sendFailureOperation(
+                boolean send = failureListener.send(
                         "Worked ran into an unhandled exception", WORKER_EXCEPTION, workerProcess, testId, cause);
 
                 if (send) {
@@ -180,7 +167,7 @@ public class WorkerProcessFailureMonitor {
             }
             workerProcess.setOomeDetected();
 
-            sendFailureOperation("Worker ran into an OOME", WORKER_OOM, workerProcess);
+            failureListener.send("Worker ran into an OOME", WORKER_OOM, workerProcess, null, null);
         }
 
         private boolean isOomeFound(File workerHome) {
@@ -201,10 +188,11 @@ public class WorkerProcessFailureMonitor {
                 return;
             }
 
-            long elapsed = TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - workerProcess.getLastSeen());
-            if (elapsed > 0 && elapsed % lastSeenTimeoutSeconds == 0) {
-                sendFailureOperation(
-                        format("Worker has not sent a message for %d seconds", elapsed), WORKER_TIMEOUT, workerProcess);
+            long idleTimeSeconds = MILLISECONDS.toSeconds(System.currentTimeMillis() - workerProcess.getLastSeen());
+
+            if (idleTimeSeconds > 0 && idleTimeSeconds % lastSeenTimeoutSeconds == 0) {
+                String msg = format("Worker has not sent a message for %d seconds", idleTimeSeconds);
+                failureListener.send(msg, WORKER_TIMEOUT, workerProcess, null, null);
             }
         }
 
@@ -220,59 +208,12 @@ public class WorkerProcessFailureMonitor {
 
             if (exitCode == 0) {
                 workerProcess.setFinished();
-                sendFailureOperation("Worker terminated normally", WORKER_FINISHED, workerProcess);
-                return;
-            }
-
-            workerProcessManager.shutdown(workerProcess);
-
-            sendFailureOperation(
-                    format("Worker terminated with exit code %d instead of 0", exitCode), WORKER_EXIT, workerProcess);
-        }
-
-        private void sendFailureOperation(String message, FailureType type, WorkerProcess workerProcess) {
-            sendFailureOperation(message, type, workerProcess, null, null);
-        }
-
-        private boolean sendFailureOperation(String message, FailureType type, WorkerProcess workerProcess,
-                                             String testId, String cause) {
-            boolean sentSuccessfully = true;
-            boolean isFailure = type != WORKER_FINISHED;
-            SimulatorAddress workerAddress = workerProcess.getAddress();
-            FailureOperation operation = new FailureOperation(message, type, workerAddress, agent.getPublicAddress(),
-                    workerProcess.getHazelcastAddress(), workerProcess.getId(), testId, agent.getTestSuite(), cause);
-
-            if (isFailure) {
-                LOGGER.error(format("Detected failure on Worker %s (%s): %s", workerProcess.getId(), workerProcess.getAddress(),
-                        operation.getLogMessage(++failureCount)));
+                failureListener.send("Worker terminated normally", WORKER_FINISHED, workerProcess, null, null);
             } else {
-                LOGGER.info(format("Worker %s (%s) finished.", workerProcess.getId(), workerProcess.getAddress()));
+                workerProcessManager.shutdown(workerProcess);
+                String msg = format("Worker terminated with exit code %d instead of 0", exitCode);
+                failureListener.send(msg, WORKER_EXIT, workerProcess, null, null);
             }
-
-            AgentConnector agentConnector = agent.getAgentConnector();
-            try {
-                Response response = agentConnector.write(SimulatorAddress.COORDINATOR, operation);
-                ResponseType firstErrorResponseType = response.getFirstErrorResponseType();
-                if (firstErrorResponseType != ResponseType.SUCCESS) {
-                    LOGGER.error(format("Could not send failure to coordinator: %s", firstErrorResponseType));
-                    sentSuccessfully = false;
-                } else if (isFailure) {
-                    LOGGER.info("Failure successfully sent to Coordinator!");
-                }
-            } catch (SimulatorProtocolException e) {
-                if (!isInterrupted() && !(e.getCause() instanceof InterruptedException)) {
-                    LOGGER.error(format("Could not send failure to coordinator! %s", operation.getFileMessage()), e);
-                    sentSuccessfully = false;
-                }
-            }
-
-            if (type.isWorkerFinishedFailure()) {
-                String finishedType = (isFailure) ? "failed" : "finished";
-                LOGGER.info(format("Removing %s Worker %s from configuration...", finishedType, workerAddress));
-                agentConnector.removeWorker(workerAddress.getWorkerIndex());
-            }
-
-            return sentSuccessfully;
         }
     }
 

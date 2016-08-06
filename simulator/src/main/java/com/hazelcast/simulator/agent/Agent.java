@@ -15,12 +15,20 @@
  */
 package com.hazelcast.simulator.agent;
 
+import com.hazelcast.simulator.agent.workerprocess.WorkerProcess;
 import com.hazelcast.simulator.agent.workerprocess.WorkerProcessFailureMonitor;
+import com.hazelcast.simulator.agent.workerprocess.WorkerProcessFailureSender;
 import com.hazelcast.simulator.agent.workerprocess.WorkerProcessManager;
 import com.hazelcast.simulator.common.CoordinatorLogger;
 import com.hazelcast.simulator.common.ShutdownThread;
 import com.hazelcast.simulator.protocol.connector.AgentConnector;
+import com.hazelcast.simulator.protocol.core.Response;
+import com.hazelcast.simulator.protocol.core.ResponseType;
+import com.hazelcast.simulator.protocol.core.SimulatorAddress;
+import com.hazelcast.simulator.protocol.core.SimulatorProtocolException;
+import com.hazelcast.simulator.protocol.operation.FailureOperation;
 import com.hazelcast.simulator.protocol.operation.OperationTypeCounter;
+import com.hazelcast.simulator.test.FailureType;
 import com.hazelcast.simulator.test.TestSuite;
 import org.apache.log4j.Logger;
 
@@ -29,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.hazelcast.simulator.common.GitInfo.getBuildTime;
 import static com.hazelcast.simulator.common.GitInfo.getCommitIdAbbrev;
+import static com.hazelcast.simulator.test.FailureType.WORKER_FINISHED;
 import static com.hazelcast.simulator.utils.CommonUtils.exitWithError;
 import static com.hazelcast.simulator.utils.CommonUtils.getSimulatorVersion;
 import static com.hazelcast.simulator.utils.FileUtils.deleteQuiet;
@@ -37,6 +46,7 @@ import static com.hazelcast.simulator.utils.FileUtils.getSimulatorHome;
 import static com.hazelcast.simulator.utils.FileUtils.writeText;
 import static com.hazelcast.simulator.utils.NativeUtils.getPID;
 import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class Agent {
 
@@ -74,7 +84,10 @@ public class Agent {
         this.cloudCredential = cloudCredential;
 
         this.workerProcessFailureMonitor = new WorkerProcessFailureMonitor(
-                this, workerProcessManager, workerLastSeenTimeoutSeconds);
+                new WorkerProcessFailureSenderImpl(),
+                workerProcessManager,
+                workerLastSeenTimeoutSeconds,
+                (int)SECONDS.toMillis(1));
         this.agentConnector = AgentConnector.createInstance(this, workerProcessManager, port, threadPoolSize);
         this.coordinatorLogger = new CoordinatorLogger(agentConnector);
 
@@ -191,6 +204,50 @@ public class Agent {
 
     private static void echo(String message, Object... args) {
         LOGGER.info(message == null ? "null" : format(message, args));
+    }
+
+    private final class WorkerProcessFailureSenderImpl implements WorkerProcessFailureSender {
+        private int failureCount;
+
+        @Override
+        public boolean send(String message, FailureType type, WorkerProcess workerProcess, String testId, String cause) {
+            boolean sentSuccessfully = true;
+            boolean isFailure = type != WORKER_FINISHED;
+            SimulatorAddress workerAddress = workerProcess.getAddress();
+            FailureOperation operation = new FailureOperation(message, type, workerAddress, publicAddress,
+                    workerProcess.getHazelcastAddress(), workerProcess.getId(), testId, testSuite, cause);
+
+            if (isFailure) {
+                LOGGER.error(format("Detected failure on Worker %s (%s): %s", workerProcess.getId(), workerProcess.getAddress(),
+                        operation.getLogMessage(++failureCount)));
+            } else {
+                LOGGER.info(format("Worker %s (%s) finished.", workerProcess.getId(), workerProcess.getAddress()));
+            }
+
+            try {
+                Response response = agentConnector.write(SimulatorAddress.COORDINATOR, operation);
+                ResponseType firstErrorResponseType = response.getFirstErrorResponseType();
+                if (firstErrorResponseType != ResponseType.SUCCESS) {
+                    LOGGER.error(format("Could not send failure to coordinator: %s", firstErrorResponseType));
+                    sentSuccessfully = false;
+                } else if (isFailure) {
+                    LOGGER.info("Failure successfully sent to Coordinator!");
+                }
+            } catch (SimulatorProtocolException e) {
+                if (!Thread.currentThread().isInterrupted() && !(e.getCause() instanceof InterruptedException)) {
+                    LOGGER.error(format("Could not send failure to coordinator! %s", operation.getFileMessage()), e);
+                    sentSuccessfully = false;
+                }
+            }
+
+            if (type.isWorkerFinishedFailure()) {
+                String finishedType = (isFailure) ? "failed" : "finished";
+                LOGGER.info(format("Removing %s Worker %s from configuration...", finishedType, workerAddress));
+                agentConnector.removeWorker(workerAddress.getWorkerIndex());
+            }
+
+            return sentSuccessfully;
+        }
     }
 
     private final class AgentShutdownThread extends ShutdownThread {

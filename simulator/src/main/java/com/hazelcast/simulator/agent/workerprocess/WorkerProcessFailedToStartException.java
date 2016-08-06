@@ -15,13 +15,13 @@
  */
 package com.hazelcast.simulator.agent.workerprocess;
 
-public class StartWorkerFailedException extends RuntimeException {
+public class WorkerProcessFailedToStartException extends RuntimeException {
 
-    public StartWorkerFailedException(String message) {
+    public WorkerProcessFailedToStartException(String message) {
         super(message);
     }
 
-    public StartWorkerFailedException(String message, Throwable cause) {
+    public WorkerProcessFailedToStartException(String message, Throwable cause) {
         super(message, cause);
     }
 }
