@@ -76,7 +76,6 @@ public class WorkerProcess {
                          WorkerProcessManager workerProcessManager,
                          WorkerProcessSettings workerProcessSettings) {
         this.agent = agent;
-
         this.workerProcessManager = workerProcessManager;
         this.workerProcessSettings = workerProcessSettings;
     }
@@ -156,12 +155,12 @@ public class WorkerProcess {
         int workerIndex = workerProcessSettings.getWorkerIndex();
         WorkerType type = workerProcessSettings.getWorkerType();
 
-        SimulatorAddress workerAddress = new SimulatorAddress(
+        address = new SimulatorAddress(
                 AddressLevel.WORKER, agent.getAddressIndex(), workerIndex, 0);
-        String workerId = workerAddress.toString() + '-' + agent.getPublicAddress() + '-' + type.toLowerCase();
-        File workerHome = ensureExistingDirectory(testSuiteDir, workerId);
+        id = address.toString() + '-' + agent.getPublicAddress() + '-' + type.toLowerCase();
+        workerHome = ensureExistingDirectory(testSuiteDir, id);
 
-        copyResourcesToWorkerHome(workerId);
+        copyResourcesToWorkerHome(id);
 
         String hzConfigFileName = (type == WorkerType.MEMBER) ? "hazelcast" : "client-hazelcast";
         hzConfigFile = ensureExistingFile(workerHome, hzConfigFileName + ".xml");
@@ -169,6 +168,7 @@ public class WorkerProcess {
 
         log4jFile = ensureExistingFile(workerHome, "log4j.xml");
         writeText(workerProcessSettings.getLog4jConfig(), log4jFile);
+
 
         generateWorkerStartScript();
 
@@ -182,7 +182,7 @@ public class WorkerProcess {
         environment.put("JAVA_HOME", javaHome);
 
         this.process = processBuilder.start();
-        workerProcessManager.add(workerAddress, this);
+        workerProcessManager.add(address, this);
     }
 
     private void waitForStartup() {
