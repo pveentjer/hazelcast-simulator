@@ -29,7 +29,7 @@ import java.io.File;
 import java.util.List;
 import java.util.Set;
 
-import static com.hazelcast.simulator.agent.workerprocess.WorkerProcessLauncher.WORKERS_HOME_NAME;
+import static com.hazelcast.simulator.agent.workerprocess.WorkerProcess.WORKERS_HOME_NAME;
 import static com.hazelcast.simulator.coordinator.Coordinator.SIMULATOR_VERSION;
 import static com.hazelcast.simulator.utils.CommonUtils.getElapsedSeconds;
 import static com.hazelcast.simulator.utils.FileUtils.copyFileToDirectory;

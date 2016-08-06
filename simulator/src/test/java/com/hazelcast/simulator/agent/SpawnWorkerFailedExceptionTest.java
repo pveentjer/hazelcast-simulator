@@ -1,5 +1,6 @@
 package com.hazelcast.simulator.agent;
 
+import com.hazelcast.simulator.agent.workerprocess.StartWorkerFailedException;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -8,7 +9,7 @@ public class SpawnWorkerFailedExceptionTest {
 
     @Test
     public void testConstructor_withMessage() throws Exception {
-        Exception exception = new SpawnWorkerFailedException("test");
+        Exception exception = new StartWorkerFailedException("test");
 
         assertEquals("test", exception.getMessage());
     }
@@ -16,7 +17,7 @@ public class SpawnWorkerFailedExceptionTest {
     @Test
     public void testConstructor_withMessageAndCause() throws Exception {
         Throwable cause = new RuntimeException("cause");
-        Exception exception = new SpawnWorkerFailedException("test", cause);
+        Exception exception = new StartWorkerFailedException("test", cause);
 
         assertEquals("test", exception.getMessage());
         assertEquals(cause, exception.getCause());

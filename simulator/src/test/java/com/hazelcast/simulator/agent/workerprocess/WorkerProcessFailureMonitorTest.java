@@ -1,12 +1,14 @@
 package com.hazelcast.simulator.agent.workerprocess;
 
 import com.hazelcast.simulator.agent.Agent;
+import com.hazelcast.simulator.coordinator.WorkerParameters;
 import com.hazelcast.simulator.protocol.connector.AgentConnector;
 import com.hazelcast.simulator.protocol.core.Response;
 import com.hazelcast.simulator.protocol.core.SimulatorAddress;
 import com.hazelcast.simulator.protocol.core.SimulatorProtocolException;
 import com.hazelcast.simulator.protocol.operation.FailureOperation;
 import com.hazelcast.simulator.protocol.operation.SimulatorOperation;
+import com.hazelcast.simulator.worker.WorkerType;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -341,18 +343,19 @@ public class WorkerProcessFailureMonitorTest {
         return new SimulatorAddress(WORKER, 1, ++addressIndex, 0);
     }
 
-    private static WorkerProcess addWorkerJvm(WorkerProcessManager workerProcessManager, SimulatorAddress address, boolean createWorkerHome) {
+    private  WorkerProcess addWorkerJvm(WorkerProcessManager workerProcessManager, SimulatorAddress address, boolean createWorkerHome) {
         Process process = mock(Process.class);
         when(process.exitValue()).thenThrow(new IllegalThreadStateException("process is still running"));
 
         return addWorkerJvm(workerProcessManager, address, createWorkerHome, process);
     }
 
-    private static WorkerProcess addWorkerJvm(WorkerProcessManager workerProcessManager, SimulatorAddress address, boolean createWorkerHome,
+    private  WorkerProcess addWorkerJvm(WorkerProcessManager workerProcessManager, SimulatorAddress address, boolean createWorkerHome,
                                               Process process) {
         int addressIndex = address.getAddressIndex();
         File workerHome = new File("worker" + address.getAddressIndex());
-        WorkerProcess workerProcess = new WorkerProcess(address, "WorkerProcessFailureMonitorTest" + addressIndex, workerHome);
+        WorkerProcessSettings workerProcessSettings = new WorkerProcessSettings(addressIndex, WorkerType.MEMBER, mock(WorkerParameters.class));
+        WorkerProcess workerProcess = new WorkerProcess(agent, workerProcessManager, workerProcessSettings);
         workerProcess.setProcess(process);
 
         workerProcessManager.add(address, workerProcess);

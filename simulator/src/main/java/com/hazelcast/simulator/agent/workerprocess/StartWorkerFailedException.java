@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.hazelcast.simulator.agent;
+package com.hazelcast.simulator.agent.workerprocess;
 
-public class SpawnWorkerFailedException extends RuntimeException {
+public class StartWorkerFailedException extends RuntimeException {
 
-    public SpawnWorkerFailedException(String message) {
+    public StartWorkerFailedException(String message) {
         super(message);
     }
 
-    public SpawnWorkerFailedException(String message, Throwable cause) {
+    public StartWorkerFailedException(String message, Throwable cause) {
         super(message, cause);
     }
 }

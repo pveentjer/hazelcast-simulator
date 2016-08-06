@@ -16,7 +16,7 @@
 package com.hazelcast.simulator.protocol.processors;
 
 import com.hazelcast.simulator.agent.Agent;
-import com.hazelcast.simulator.agent.workerprocess.WorkerProcessLauncher;
+import com.hazelcast.simulator.agent.workerprocess.WorkerProcess;
 import com.hazelcast.simulator.agent.workerprocess.WorkerProcessManager;
 import com.hazelcast.simulator.agent.workerprocess.WorkerProcessSettings;
 import com.hazelcast.simulator.protocol.core.Response;
@@ -132,8 +132,8 @@ public class AgentOperationProcessor extends OperationProcessor {
     private ResponseType processCreateWorker(CreateWorkerOperation operation) throws Exception {
         ArrayList<Future<Boolean>> futures = new ArrayList<Future<Boolean>>();
         for (WorkerProcessSettings workerProcessSettings : operation.getWorkerJvmSettings()) {
-            WorkerProcessLauncher launcher = new WorkerProcessLauncher(agent, workerProcessManager, workerProcessSettings);
-            LaunchWorkerCallable task = new LaunchWorkerCallable(launcher, workerProcessSettings);
+            WorkerProcess workerProcess = new WorkerProcess(agent, workerProcessManager, workerProcessSettings);
+            StartWorkerCallable task = new StartWorkerCallable(workerProcess, workerProcessSettings);
             Future<Boolean> future = executorService.schedule(task, operation.getDelayMs(), TimeUnit.MILLISECONDS);
             futures.add(future);
         }
@@ -154,20 +154,20 @@ public class AgentOperationProcessor extends OperationProcessor {
         agent.getWorkerProcessFailureMonitor().stopTimeoutDetection();
     }
 
-    private final class LaunchWorkerCallable implements Callable<Boolean> {
+    private final class StartWorkerCallable implements Callable<Boolean> {
 
-        private final WorkerProcessLauncher launcher;
+        private final WorkerProcess process;
         private final WorkerProcessSettings workerProcessSettings;
 
-        private LaunchWorkerCallable(WorkerProcessLauncher launcher, WorkerProcessSettings workerProcessSettings) {
-            this.launcher = launcher;
+        private StartWorkerCallable(WorkerProcess workerProcess, WorkerProcessSettings workerProcessSettings) {
+            this.process = workerProcess;
             this.workerProcessSettings = workerProcessSettings;
         }
 
         @Override
         public Boolean call() {
             try {
-                launcher.launch();
+                process.start();
 
                 int workerIndex = workerProcessSettings.getWorkerIndex();
                 int workerPort = agent.getPort() + workerIndex;
