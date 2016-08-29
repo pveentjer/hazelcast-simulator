@@ -70,4 +70,15 @@ public @interface TimeStep {
      * @return the executionGroup.
      */
     String executionGroup() default "";
+
+    /**
+     * Gets the name of the probability property. Normally the name of the method gets a 'Prob' postfix, however there are some
+     * legacy tests that don't follow this naming convention. To make sure we can keep running these tests with old property file,
+     * the property name is configurable.
+     *
+     * Probably it is best not to use this setting.
+     *
+     * @return the name of the property.
+     */
+    String probName() default "";
 }

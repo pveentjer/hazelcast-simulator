@@ -34,6 +34,16 @@ public class TimeStepModel_probabilityTest {
     }
 
     @Test(expected = IllegalTestException.class)
+    public void test_probability_conflictingProbeNames() {
+        HashMap<String, Double> probs = new HashMap<String, Double>();
+
+        loadModel("public class CLAZZ{\n"
+                + "@TimeStep(prob=0.5,probName=\"a\") public void timeStep1(){}\n"
+                + "@TimeStep(prob=0.5,probName=\"a\") public void timeStep2(){}\n"
+                + "}\n", probs);
+    }
+
+    @Test(expected = IllegalTestException.class)
     public void test_probability_probabilityUsingAnnotationExceedsOne() {
         HashMap<String, Double> probs = new HashMap<String, Double>();
 
@@ -63,6 +73,22 @@ public class TimeStepModel_probabilityTest {
                 + "@TimeStep(prob=0.5) public void timeStep1(){}\n"
                 + "@TimeStep(prob=0.5) public void timeStep2(){}\n"
                 + "}\n", probs);
+    }
+
+    @Test
+    public void test_probability_customNamesAndExternalConfig() {
+        HashMap<String, Double> probs = new HashMap<String, Double>();
+        probs.put("a", 0.2);
+        probs.put("b", 0.8);
+
+        TimeStepModel model = loadModel("public class CLAZZ{\n"
+                + "@TimeStep(prob=0.5, probName=\"a\") public void timeStep1(){}\n"
+                + "@TimeStep(prob=0.5, probName=\"b\") public void timeStep2(){}\n"
+                + "}\n", probs);
+
+        assertProbability(model, "timeStep1", 0.2);
+        assertProbability(model, "timeStep2", 0.8);
+        assertNotNull(model.getTimeStepProbabilityArray(""));
     }
 
     @Test(expected = IllegalTestException.class)

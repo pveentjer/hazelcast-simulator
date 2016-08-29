@@ -18,14 +18,15 @@ package com.hazelcast.simulator.tests.icache;
 import com.hazelcast.cache.ICache;
 import com.hazelcast.core.IList;
 import com.hazelcast.simulator.test.AbstractTest;
-import com.hazelcast.simulator.test.annotations.RunWithWorker;
+import com.hazelcast.simulator.test.BaseThreadState;
+import com.hazelcast.simulator.test.annotations.AfterRun;
+import com.hazelcast.simulator.test.annotations.AfterWarmup;
 import com.hazelcast.simulator.test.annotations.Setup;
+import com.hazelcast.simulator.test.annotations.TimeStep;
 import com.hazelcast.simulator.test.annotations.Verify;
 import com.hazelcast.simulator.tests.icache.helpers.CacheUtils;
 import com.hazelcast.simulator.tests.icache.helpers.ICacheEntryEventFilter;
 import com.hazelcast.simulator.tests.icache.helpers.ICacheEntryListener;
-import com.hazelcast.simulator.worker.selector.OperationSelectorBuilder;
-import com.hazelcast.simulator.worker.tasks.AbstractWorker;
 
 import javax.cache.configuration.CacheEntryListenerConfiguration;
 import javax.cache.configuration.FactoryBuilder;
@@ -35,9 +36,10 @@ import javax.cache.expiry.Duration;
 import javax.cache.expiry.ExpiryPolicy;
 import java.io.Serializable;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.hazelcast.simulator.utils.CommonUtils.sleepSeconds;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -49,29 +51,9 @@ public class ListenerICacheTest extends AbstractTest {
 
     private static final int PAUSE_FOR_LAST_EVENTS_SECONDS = 10;
 
-    private enum Operation {
-        PUT,
-        PUT_EXPIRY,
-        PUT_EXPIRY_ASYNC,
-        GET_EXPIRY,
-        GET_EXPIRY_ASYNC,
-        REMOVE,
-        REPLACE
-    }
-
     public int keyCount = 1000;
     public int maxExpiryDurationMs = 500;
     public boolean syncEvents = true;
-
-    public double put = 0.8;
-    public double putExpiry = 0.0;
-    public double putAsyncExpiry = 0.0;
-    public double getExpiry = 0.0;
-    public double getAsyncExpiry = 0.0;
-    public double remove = 0.1;
-    public double replace = 0.1;
-
-    private final OperationSelectorBuilder<Operation> builder = new OperationSelectorBuilder<Operation>();
 
     private IList<Counter> results;
     private IList<ICacheEntryListener> listeners;
@@ -79,6 +61,7 @@ public class ListenerICacheTest extends AbstractTest {
     private ICache<Integer, Long> cache;
     private ICacheEntryListener<Integer, Long> listener;
     private ICacheEntryEventFilter<Integer, Long> filter;
+    private final AtomicBoolean afterCompletionCalled = new AtomicBoolean(false);
 
     @Setup
     public void setup() {
@@ -94,91 +77,91 @@ public class ListenerICacheTest extends AbstractTest {
                 FactoryBuilder.factoryOf(filter),
                 false, syncEvents);
         cache.registerCacheEntryListener(config);
-
-        builder.addOperation(Operation.PUT, put)
-                .addOperation(Operation.PUT_EXPIRY, putExpiry)
-                .addOperation(Operation.PUT_EXPIRY_ASYNC, putAsyncExpiry)
-                .addOperation(Operation.GET_EXPIRY, getExpiry)
-                .addOperation(Operation.GET_EXPIRY_ASYNC, getAsyncExpiry)
-                .addOperation(Operation.REMOVE, remove)
-                .addOperation(Operation.REPLACE, replace);
     }
 
-    @RunWithWorker
-    public Worker run() {
-        return new Worker();
+    @TimeStep(prob = 0.8, probName = "put")
+    public void put(ThreadState state) {
+        int key = state.randomInt(keyCount);
+        cache.put(key, state.randomLong());
+        state.counter.put++;
     }
 
-    private final class Worker extends AbstractWorker<Operation> {
+    @TimeStep(prob = 0, probName = "putExpiry")
+    public void putExpiry(ThreadState state) {
+        int expiryDuration = state.randomInt(maxExpiryDurationMs);
+        ExpiryPolicy expiryPolicy = new CreatedExpiryPolicy(new Duration(MILLISECONDS, expiryDuration));
 
-        private final Counter counter = new Counter();
+        int key = state.randomInt(keyCount);
+        cache.put(key, state.randomLong(), expiryPolicy);
+        state.counter.putExpiry++;
+    }
 
-        private Worker() {
-            super(builder);
+    @TimeStep(prob = 0, probName = "putAsyncExpiry")
+    public void putAsyncExpiry(ThreadState state) {
+        int expiryDuration = state.randomInt(maxExpiryDurationMs);
+        ExpiryPolicy expiryPolicy = new CreatedExpiryPolicy(new Duration(MILLISECONDS, expiryDuration));
+
+        int key = state.randomInt(keyCount);
+        cache.putAsync(key, state.randomLong(), expiryPolicy);
+        state.counter.putAsyncExpiry++;
+    }
+
+    @TimeStep(prob = 0, probName = "getExpiry")
+    public void getExpiry(ThreadState state) {
+        int expiryDuration = state.randomInt(maxExpiryDurationMs);
+        ExpiryPolicy expiryPolicy = new CreatedExpiryPolicy(new Duration(MILLISECONDS, expiryDuration));
+
+        int key = state.randomInt(keyCount);
+        cache.get(key, expiryPolicy);
+        state.counter.getExpiry++;
+    }
+
+    @TimeStep(prob = 0, probName = "getAsyncExpiry")
+    public void getAsyncExpiry(ThreadState state) throws Exception {
+        int expiryDuration = state.randomInt(maxExpiryDurationMs);
+        ExpiryPolicy expiryPolicy = new CreatedExpiryPolicy(new Duration(MILLISECONDS, expiryDuration));
+
+        int key = state.randomInt(keyCount);
+        Future<Long> future = cache.getAsync(key, expiryPolicy);
+        future.get();
+        state.counter.getAsyncExpiry++;
+    }
+
+    @TimeStep(prob = 0.1, probName = "remove")
+    public void remove(ThreadState state) {
+        int key = state.randomInt(keyCount);
+        if (cache.remove(key)) {
+            state.counter.remove++;
         }
+    }
 
-        @Override
-        protected void timeStep(Operation operation) throws Exception {
-            int expiryDuration = randomInt(maxExpiryDurationMs);
-            ExpiryPolicy expiryPolicy = new CreatedExpiryPolicy(new Duration(TimeUnit.MILLISECONDS, expiryDuration));
-
-            int key = randomInt(keyCount);
-
-            switch (operation) {
-                case PUT:
-                    cache.put(key, getRandom().nextLong());
-                    counter.put++;
-                    break;
-
-                case PUT_EXPIRY:
-                    cache.put(key, getRandom().nextLong(), expiryPolicy);
-                    counter.putExpiry++;
-                    break;
-
-                case PUT_EXPIRY_ASYNC:
-                    cache.putAsync(key, getRandom().nextLong(), expiryPolicy);
-                    counter.putAsyncExpiry++;
-                    break;
-
-                case GET_EXPIRY:
-                    cache.get(key, expiryPolicy);
-                    counter.getExpiry++;
-                    break;
-
-                case GET_EXPIRY_ASYNC:
-                    Future<Long> future = cache.getAsync(key, expiryPolicy);
-                    future.get();
-                    counter.getAsyncExpiry++;
-                    break;
-
-                case REMOVE:
-                    if (cache.remove(key)) {
-                        counter.remove++;
-                    }
-                    break;
-
-                case REPLACE:
-                    if (cache.replace(key, getRandom().nextLong())) {
-                        counter.replace++;
-                    }
-                    break;
-
-                default:
-                    throw new UnsupportedOperationException();
-            }
+    @TimeStep(prob = 0.1, probName = "replace")
+    public void replace(ThreadState state) {
+        int key = state.randomInt(keyCount);
+        if (cache.replace(key, state.randomLong())) {
+            state.counter.replace++;
         }
+    }
 
-        @Override
-        public void afterRun() {
-            results.add(counter);
-        }
+    @AfterRun
+    public void afterRun(ThreadState state) {
+        results.add(state.counter);
 
-        @Override
-        public void afterCompletion() {
+        if (afterCompletionCalled.compareAndSet(false, true)) {
             listeners.add(listener);
 
             sleepSeconds(PAUSE_FOR_LAST_EVENTS_SECONDS);
         }
+    }
+
+    @AfterWarmup
+    public void afterWarmup() {
+        afterCompletionCalled.set(false);
+    }
+
+    public final class ThreadState extends BaseThreadState {
+
+        private final Counter counter = new Counter();
     }
 
     @Verify(global = false)

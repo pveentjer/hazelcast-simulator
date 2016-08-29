@@ -175,6 +175,7 @@ public class TimeStepModel {
         }
 
         validateUniqueMethodNames(methods);
+        validateNoProbNameProblems(methods);
         validateModifiers(methods);
         validateTimeStepArguments(methods);
 
@@ -235,6 +236,20 @@ public class TimeStepModel {
             if (!names.add(methodName)) {
                 throw new IllegalTestException(
                         testClass.getName() + " has two or more TimeStep methods with name '" + methodName + "'");
+            }
+        }
+    }
+
+    private void validateNoProbNameProblems(List<Method> methods) {
+        Set<String> names = new HashSet<String>();
+
+        for (Method method : methods) {
+            TimeStep timeStep = method.getAnnotation(TimeStep.class);
+            String probName = timeStep.probName().equals("") ? method.getName() + "Prob" : timeStep.probName();
+
+            if (!names.add(probName)) {
+                throw new IllegalTestException(
+                        testClass.getName() + " has two or more TimeStep methods with probability  '" + probName + "'");
             }
         }
     }
@@ -427,13 +442,15 @@ public class TimeStepModel {
 
 
         private Probability loadProbability(Method method) {
-            String propertyName = method.getName() + "Prob";
+            TimeStep timeStep = method.getAnnotation(TimeStep.class);
+
+            String propertyName = timeStep.probName().equals("") ? method.getName() + "Prob" : timeStep.probName();
             String valueString = propertyBinding.loadProperty(propertyName);
 
             double value;
             if (valueString == null) {
                 // nothing was specified. So lets use what is on the annotation
-                value = method.getAnnotation(TimeStep.class).prob();
+                value = timeStep.prob();
             } else {
                 // the user has explicitly configured a probability
                 try {
