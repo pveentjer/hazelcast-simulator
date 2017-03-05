@@ -22,7 +22,6 @@ import com.hazelcast.simulator.probes.impl.EmptyProbe;
 import com.hazelcast.simulator.probes.impl.HdrProbe;
 import com.hazelcast.simulator.test.TestContext;
 import com.hazelcast.simulator.test.annotations.InjectHazelcastInstance;
-import com.hazelcast.simulator.test.annotations.InjectProbe;
 import com.hazelcast.simulator.test.annotations.InjectTestContext;
 import com.hazelcast.simulator.utils.BindException;
 import com.hazelcast.simulator.utils.PropertyBindingSupport;
@@ -34,8 +33,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.hazelcast.simulator.utils.AnnotationReflectionUtils.getProbeName;
-import static com.hazelcast.simulator.utils.AnnotationReflectionUtils.isPartOfTotalThroughput;
 import static com.hazelcast.simulator.utils.Preconditions.checkNotNull;
 import static com.hazelcast.simulator.utils.PropertyBindingSupport.bindAll;
 import static com.hazelcast.simulator.utils.ReflectionUtils.setFieldValue;
@@ -48,7 +45,6 @@ import static java.lang.String.format;
  * <li>values in public fields</li>
  * <li>TestContext in fields annotated with {@link InjectTestContext}</li>
  * <li>HazelcastInstance in fields annotated with @{@link InjectHazelcastInstance}</li>
- * <li>Probe instance in fields annotated with {@link InjectProbe}</li>
  * </ol>
  * <p>
  * The {@link PropertyBinding} also keeps track of all used properties. This makes it possible to detect if there are any unused
@@ -211,10 +207,6 @@ public class PropertyBinding {
         } else if (field.isAnnotationPresent(InjectHazelcastInstance.class)) {
             assertFieldType(fieldType, HazelcastInstance.class, InjectHazelcastInstance.class);
             setFieldValue(object, field, testContext.getTargetInstance());
-        } else if (field.isAnnotationPresent(InjectProbe.class)) {
-            assertFieldType(fieldType, Probe.class, InjectProbe.class);
-            Probe probe = getOrCreateProbe(getProbeName(field), isPartOfTotalThroughput(field));
-            setFieldValue(object, field, probe);
         }
     }
 
