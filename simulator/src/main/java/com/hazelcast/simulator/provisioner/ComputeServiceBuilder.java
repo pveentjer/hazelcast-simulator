@@ -33,6 +33,7 @@ import java.util.Properties;
 
 import static com.hazelcast.simulator.common.SimulatorProperties.CLOUD_PROVIDER;
 import static com.hazelcast.simulator.utils.CloudProviderUtils.isStatic;
+import static com.hazelcast.simulator.utils.CloudProviderUtils.isTrueCloud;
 import static com.hazelcast.simulator.utils.FileUtils.newFile;
 import static com.hazelcast.simulator.utils.FormatUtils.NEW_LINE;
 import static java.lang.String.format;
@@ -57,12 +58,13 @@ class ComputeServiceBuilder {
     ComputeService build() {
         ensurePublicPrivateKeyExist(PUBLIC_KEY, PRIVATE_KEY);
 
-        if (isStatic(properties)) {
+        String cloudProvider = properties.getCloudProvider();
+
+        if (!isTrueCloud(cloudProvider)) {
             return null;
         }
 
-        String cloudProvider = properties.getCloudProvider();
-        if (LOGGER.isDebugEnabled()) {
+         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug(format("Using %s: %s", CLOUD_PROVIDER, cloudProvider));
         }
 

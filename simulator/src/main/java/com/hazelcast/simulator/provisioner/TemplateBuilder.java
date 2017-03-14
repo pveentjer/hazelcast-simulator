@@ -19,6 +19,8 @@ import com.hazelcast.simulator.common.SimulatorProperties;
 import org.apache.log4j.Logger;
 import org.jclouds.aws.ec2.AWSEC2Api;
 import org.jclouds.aws.ec2.compute.AWSEC2TemplateOptions;
+import org.jclouds.aws.ec2.domain.VPC;
+import org.jclouds.aws.ec2.features.VPCApi;
 import org.jclouds.compute.ComputeService;
 import org.jclouds.compute.domain.Template;
 import org.jclouds.compute.domain.TemplateBuilderSpec;
@@ -26,7 +28,9 @@ import org.jclouds.compute.domain.Volume;
 import org.jclouds.compute.options.TemplateOptions;
 import org.jclouds.ec2.compute.options.EC2TemplateOptions;
 import org.jclouds.ec2.domain.SecurityGroup;
+import org.jclouds.ec2.domain.Subnet;
 import org.jclouds.ec2.features.SecurityGroupApi;
+import org.jclouds.ec2.features.SubnetApi;
 import org.jclouds.scriptbuilder.ScriptBuilder;
 import org.jclouds.scriptbuilder.statements.login.AdminAccess;
 
@@ -106,30 +110,23 @@ final class TemplateBuilder {
 
         templateOptions.inboundPorts(inboundPorts());
 
-        String subnetId = simulatorProperties.get("SUBNET_ID", DEFAULT);
+        String subnetId = simulatorProperties.get("SUBNET_ID");
         if (DEFAULT.equals(subnetId) || subnetId.isEmpty()) {
-            initSecurityGroup(spec, securityGroup);
-            templateOptions.securityGroups(securityGroup);
+            initSecurityGroup(spec, securityGroup, templateOptions);
         } else {
-            if (!isEC2) {
-                throw new IllegalStateException("SUBNET_ID can be used only when EC2 is configured as a cloud provider.");
-            }
-            LOGGER.info("Using VPC with Subnet ID = " + subnetId);
-            templateOptions
-                    .as(AWSEC2TemplateOptions.class)
-                    .subnetId(subnetId);
+            initSubnet(spec, templateOptions, subnetId);
         }
 
-        String placementGroup = simulatorProperties.get("PLACEMENT_GROUP", DEFAULT);
-        if (!placementGroup.isEmpty() && !placementGroup.equals(DEFAULT)) {
-            if (!isEC2) {
-                throw new IllegalStateException("PLACEMENT_GROUP can be used only when EC2 is configured as a cloud provider.");
-            }
-            LOGGER.info("Using PlacementGroup = " + placementGroup);
-
-            templateOptions.as(AWSEC2TemplateOptions.class)
-                    .placementGroup(placementGroup);
-        }
+//        String placementGroup = simulatorProperties.get("PLACEMENT_GROUP");
+//        if (!placementGroup.isEmpty() && !placementGroup.equals(DEFAULT)) {
+//            if (!isEC2) {
+//                throw new IllegalStateException("PLACEMENT_GROUP can be used only when EC2 is configured as a cloud provider.");
+//            }
+//            LOGGER.info("Using PlacementGroup = " + placementGroup);
+//
+//            templateOptions.as(AWSEC2TemplateOptions.class)
+//                    .placementGroup(placementGroup);
+//        }
 
         if (isEC2) {
             EC2TemplateOptions ec2TemplateOptions = templateOptions.as(EC2TemplateOptions.class);
@@ -140,6 +137,77 @@ final class TemplateBuilder {
 
         LOGGER.info("Successfully created jclouds template");
         return template;
+    }
+
+    private void initSubnet(TemplateBuilderSpec spec, TemplateOptions templateOptions, String subnetId) {
+        if (!isEC2) {
+            throw new IllegalStateException("SUBNET_ID can be used only when EC2 is configured as a cloud provider.");
+        }
+        LOGGER.info("Using VPC with Subnet ID = " + subnetId);
+
+        AWSEC2Api ec2Api = compute.getContext().unwrapApi(AWSEC2Api.class);
+        SubnetApi subnetApi = ec2Api.getSubnetApi().get();
+        Subnet result = null;
+        List<String> availableSubnets = new ArrayList<String>();
+        for (Subnet subnet : subnetApi.list()) {
+            LOGGER.info(subnet.getSubnetId());
+            if (subnet.getSubnetId().equals(subnetId)) {
+                result = subnet;
+                break;
+            }
+            availableSubnets.add(subnet.getSubnetId());
+            LOGGER.info("'" + subnet.getSubnetId() + "' '" + subnetId + "'");
+        }
+
+        if (result == null) {
+            throw new IllegalStateException("SUBNET_ID '"+subnetId+"' is invalid. No subnet with this id is found. " +
+                    "The following subnets are available " + availableSubnets);
+        }
+
+        String region = spec.getLocationId();
+        if (region == null) {
+            region = "us-east-1";
+        }
+
+        LOGGER.info("subnet-id:"+result.getSubnetId()+" vpc-id:"+result.getVpcId());
+
+
+        VPCApi vpcApi = ec2Api.getVPCApi().get();
+        for(VPC vpc: vpcApi.describeVpcsInRegion(region)){
+            LOGGER.info(vpc);
+        }
+
+        AWSEC2TemplateOptions awsec2TemplateOptions = templateOptions.as(AWSEC2TemplateOptions.class);
+        awsec2TemplateOptions.subnetId(result.getSubnetId());
+
+
+        // in case of AWS, we are going to create the security group, if it doesn't exist
+        // String region = spec.getLocationId();
+//        if (region == null) {
+//            region = "us-east-1";
+//        }
+//
+//        for (Subnet subnet : subnetApi.list()) {
+//            LOGGER.info(subnet);
+//        }
+//
+//        Set<SecurityGroup> securityGroups = securityGroupApi.describeSecurityGroupsInRegion(region, securityGroup);
+//        if (!securityGroups.isEmpty()) {
+//            LOGGER.info("Security group: '" + securityGroup + "' is found in region '" + region + '\'');
+//        } else {
+//            LOGGER.info("Security group: '" + securityGroup + "' is not found in region '" + region + "', creating it on the fly");
+//            securityGroupApi.createSecurityGroupInRegion(region, securityGroup, securityGroup);
+//            for (Map.Entry<Integer, Integer> portRangeEntry : portRangeMap.entrySet()) {
+//                int startPort = portRangeEntry.getKey();
+//                int endPort = portRangeEntry.getValue();
+//                securityGroupApi.authorizeSecurityGroupIngressInRegion(region, securityGroup, TCP, startPort, endPort, CIDR_RANGE);
+//            }
+//
+//            securityGroups = securityGroupApi.describeSecurityGroupsInRegion(region, securityGroup);
+//        }
+//
+//        String securityGroupId = securityGroups.iterator().next().getId();
+//        templateOptions.securityGroups(securityGroupId);
     }
 
     private void addAdminAccess(String user) {
@@ -163,7 +231,7 @@ final class TemplateBuilder {
         return toPrimitive(ports.toArray(new Integer[ports.size()]));
     }
 
-    private void initSecurityGroup(TemplateBuilderSpec spec, String securityGroup) {
+    private void initSecurityGroup(TemplateBuilderSpec spec, String securityGroup, TemplateOptions templateOptions) {
         if (!isEC2) {
             return;
         }
@@ -179,16 +247,20 @@ final class TemplateBuilder {
         Set<SecurityGroup> securityGroups = securityGroupApi.describeSecurityGroupsInRegion(region, securityGroup);
         if (!securityGroups.isEmpty()) {
             LOGGER.info("Security group: '" + securityGroup + "' is found in region '" + region + '\'');
-            return;
+        } else {
+            LOGGER.info("Security group: '" + securityGroup + "' is not found in region '" + region + "', creating it on the fly");
+            securityGroupApi.createSecurityGroupInRegion(region, securityGroup, securityGroup);
+            for (Map.Entry<Integer, Integer> portRangeEntry : portRangeMap.entrySet()) {
+                int startPort = portRangeEntry.getKey();
+                int endPort = portRangeEntry.getValue();
+                securityGroupApi.authorizeSecurityGroupIngressInRegion(region, securityGroup, TCP, startPort, endPort, CIDR_RANGE);
+            }
+
+            securityGroups = securityGroupApi.describeSecurityGroupsInRegion(region, securityGroup);
         }
 
-        LOGGER.info("Security group: '" + securityGroup + "' is not found in region '" + region + "', creating it on the fly");
-        securityGroupApi.createSecurityGroupInRegion(region, securityGroup, securityGroup);
-        for (Map.Entry<Integer, Integer> portRangeEntry : portRangeMap.entrySet()) {
-            int startPort = portRangeEntry.getKey();
-            int endPort = portRangeEntry.getValue();
-            securityGroupApi.authorizeSecurityGroupIngressInRegion(region, securityGroup, TCP, startPort, endPort, CIDR_RANGE);
-        }
+        String securityGroupId = securityGroups.iterator().next().getId();
+        templateOptions.securityGroups(securityGroupId);
     }
 
     private void mapDevices(EC2TemplateOptions ec2TemplateOptions, Template template, String user) {

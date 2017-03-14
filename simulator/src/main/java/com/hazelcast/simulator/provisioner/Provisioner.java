@@ -280,6 +280,7 @@ class Provisioner {
             for (AgentData agentData : componentRegistry.getAgents(batchSize)) {
                 terminateMap.put(agentData.getPublicAddress(), agentData);
             }
+
             Set destroyedSet = computeService.destroyNodesMatching(new NodeMetadataPredicate(componentRegistry, terminateMap));
             destroyedCount += destroyedSet.size();
         }
