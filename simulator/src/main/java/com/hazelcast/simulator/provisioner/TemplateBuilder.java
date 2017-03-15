@@ -114,19 +114,19 @@ final class TemplateBuilder {
         if (DEFAULT.equals(subnetId) || subnetId.isEmpty()) {
             initSecurityGroup(spec, securityGroup, templateOptions);
         } else {
-            initSubnet(spec, templateOptions, subnetId);
+            initSubnet(spec, templateOptions, subnetId, securityGroup);
         }
 
-//        String placementGroup = simulatorProperties.get("PLACEMENT_GROUP");
-//        if (!placementGroup.isEmpty() && !placementGroup.equals(DEFAULT)) {
-//            if (!isEC2) {
-//                throw new IllegalStateException("PLACEMENT_GROUP can be used only when EC2 is configured as a cloud provider.");
-//            }
-//            LOGGER.info("Using PlacementGroup = " + placementGroup);
-//
-//            templateOptions.as(AWSEC2TemplateOptions.class)
-//                    .placementGroup(placementGroup);
-//        }
+        String placementGroup = simulatorProperties.get("PLACEMENT_GROUP");
+        if (!placementGroup.isEmpty() && !placementGroup.equals(DEFAULT)) {
+            if (!isEC2) {
+                throw new IllegalStateException("PLACEMENT_GROUP can be used only when EC2 is configured as a cloud provider.");
+            }
+            LOGGER.info("Using PlacementGroup = " + placementGroup);
+
+            templateOptions.as(AWSEC2TemplateOptions.class)
+                    .placementGroup(placementGroup);
+        }
 
         if (isEC2) {
             EC2TemplateOptions ec2TemplateOptions = templateOptions.as(EC2TemplateOptions.class);
@@ -139,7 +139,7 @@ final class TemplateBuilder {
         return template;
     }
 
-    private void initSubnet(TemplateBuilderSpec spec, TemplateOptions templateOptions, String subnetId) {
+    private void initSubnet(TemplateBuilderSpec spec, TemplateOptions templateOptions, String subnetId, String securityGroup) {
         if (!isEC2) {
             throw new IllegalStateException("SUBNET_ID can be used only when EC2 is configured as a cloud provider.");
         }
@@ -153,14 +153,15 @@ final class TemplateBuilder {
             LOGGER.info(subnet.getSubnetId());
             if (subnet.getSubnetId().equals(subnetId)) {
                 result = subnet;
-                break;
+                //break;
             }
             availableSubnets.add(subnet.getSubnetId());
             LOGGER.info("'" + subnet.getSubnetId() + "' '" + subnetId + "'");
+            LOGGER.info(subnet);
         }
 
         if (result == null) {
-            throw new IllegalStateException("SUBNET_ID '"+subnetId+"' is invalid. No subnet with this id is found. " +
+            throw new IllegalStateException("SUBNET_ID '" + subnetId + "' is invalid. No subnet with this id is found. " +
                     "The following subnets are available " + availableSubnets);
         }
 
@@ -169,45 +170,20 @@ final class TemplateBuilder {
             region = "us-east-1";
         }
 
-        LOGGER.info("subnet-id:"+result.getSubnetId()+" vpc-id:"+result.getVpcId());
+        LOGGER.info("subnet-id:" + result.getSubnetId() + " vpc-id:" + result.getVpcId());
 
 
         VPCApi vpcApi = ec2Api.getVPCApi().get();
-        for(VPC vpc: vpcApi.describeVpcsInRegion(region)){
+        for (VPC vpc : vpcApi.describeVpcsInRegion(region)) {
             LOGGER.info(vpc);
         }
+
+        // so the problem is finding the security group that belongs to a subnet.
 
         AWSEC2TemplateOptions awsec2TemplateOptions = templateOptions.as(AWSEC2TemplateOptions.class);
         awsec2TemplateOptions.subnetId(result.getSubnetId());
 
-
-        // in case of AWS, we are going to create the security group, if it doesn't exist
-        // String region = spec.getLocationId();
-//        if (region == null) {
-//            region = "us-east-1";
-//        }
-//
-//        for (Subnet subnet : subnetApi.list()) {
-//            LOGGER.info(subnet);
-//        }
-//
-//        Set<SecurityGroup> securityGroups = securityGroupApi.describeSecurityGroupsInRegion(region, securityGroup);
-//        if (!securityGroups.isEmpty()) {
-//            LOGGER.info("Security group: '" + securityGroup + "' is found in region '" + region + '\'');
-//        } else {
-//            LOGGER.info("Security group: '" + securityGroup + "' is not found in region '" + region + "', creating it on the fly");
-//            securityGroupApi.createSecurityGroupInRegion(region, securityGroup, securityGroup);
-//            for (Map.Entry<Integer, Integer> portRangeEntry : portRangeMap.entrySet()) {
-//                int startPort = portRangeEntry.getKey();
-//                int endPort = portRangeEntry.getValue();
-//                securityGroupApi.authorizeSecurityGroupIngressInRegion(region, securityGroup, TCP, startPort, endPort, CIDR_RANGE);
-//            }
-//
-//            securityGroups = securityGroupApi.describeSecurityGroupsInRegion(region, securityGroup);
-//        }
-//
-//        String securityGroupId = securityGroups.iterator().next().getId();
-//        templateOptions.securityGroups(securityGroupId);
+        templateOptions.securityGroups(securityGroup);
     }
 
     private void addAdminAccess(String user) {
@@ -235,7 +211,11 @@ final class TemplateBuilder {
         if (!isEC2) {
             return;
         }
+        String securityGroupId = ensureExistingSecurityGroup(spec, securityGroup);
+        templateOptions.securityGroups(securityGroupId);
+    }
 
+    private String ensureExistingSecurityGroup(TemplateBuilderSpec spec, String securityGroup) {
         // in case of AWS, we are going to create the security group, if it doesn't exist
         AWSEC2Api ec2Api = compute.getContext().unwrapApi(AWSEC2Api.class);
         SecurityGroupApi securityGroupApi = ec2Api.getSecurityGroupApi().get();
@@ -248,7 +228,8 @@ final class TemplateBuilder {
         if (!securityGroups.isEmpty()) {
             LOGGER.info("Security group: '" + securityGroup + "' is found in region '" + region + '\'');
         } else {
-            LOGGER.info("Security group: '" + securityGroup + "' is not found in region '" + region + "', creating it on the fly");
+            LOGGER.info("Security group: '" + securityGroup + "' is not found in region '" + region
+                    + "', creating it on the fly");
             securityGroupApi.createSecurityGroupInRegion(region, securityGroup, securityGroup);
             for (Map.Entry<Integer, Integer> portRangeEntry : portRangeMap.entrySet()) {
                 int startPort = portRangeEntry.getKey();
@@ -259,8 +240,7 @@ final class TemplateBuilder {
             securityGroups = securityGroupApi.describeSecurityGroupsInRegion(region, securityGroup);
         }
 
-        String securityGroupId = securityGroups.iterator().next().getId();
-        templateOptions.securityGroups(securityGroupId);
+        return securityGroups.iterator().next().getId();
     }
 
     private void mapDevices(EC2TemplateOptions ec2TemplateOptions, Template template, String user) {
