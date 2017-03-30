@@ -29,5 +29,6 @@
         <module>tests-ignite</module>
         <module>tests-infinispan</module>
         <module>tests-couchbase</module>
+        <module>tests-geode</module>
     </modules>
 </project>

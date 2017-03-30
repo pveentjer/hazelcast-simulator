@@ -42,6 +42,10 @@
     <suppress checks="MagicNumber|VisibilityModifier" files="/com/hazelcast/simulator/couchbase/"/>
     <suppress checks="JUnitTestCase|MethodName|TypeName|ExplicitInitialization"
               files="/com/hazelcast/simulator/couchbase/.*Test\.java$"/>
+    <!-- Geode Tests -->
+    <suppress checks="MagicNumber|VisibilityModifier" files="/com/hazelcast/simulator/geode/"/>
+    <suppress checks="JUnitTestCase|MethodName|TypeName|ExplicitInitialization"
+              files="/com/hazelcast/simulator/geode/.*Test\.java$"/>
 
     <!-- file comes from HdrHistogram project; see comments for more info -->
     <suppress checks="" files="com/hazelcast/simulator/utils/HistogramLogProcessor"/>

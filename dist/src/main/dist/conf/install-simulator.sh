@@ -70,6 +70,18 @@ if [ "$VENDOR" = "couchbase" ]; then
     uploadLibraryJar "rxjava-*"
 fi
 
+#hack to get geode working
+if [ "$VENDOR" = "geode" ]; then
+    uploadLibraryJar "geode-*"
+    uploadLibraryJar "commons-io-*"
+    uploadLibraryJar "commons-lang-*"
+    uploadLibraryJar "shiro-core-*"
+    uploadLibraryJar "jackson-*"
+    uploadLibraryJar "fastutil-*"
+    uploadLibraryJar "antlr-*"
+    uploadLibraryJar "javax.*"
+fi
+
 # upload remaining files
 uploadToRemoteSimulatorDir "$SIMULATOR_HOME/bin/" "bin"
 uploadToRemoteSimulatorDir "$SIMULATOR_HOME/conf/" "conf"
