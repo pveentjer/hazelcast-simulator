@@ -1,30 +1,13 @@
-/*
- * Copyright (c) 2008-2016, Hazelcast, Inc. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-package com.hazelcast.simulator.tests.map.helpers;
+package com.hazelcast.simulator.tests.dataset;
+
+import com.hazelcast.nio.ObjectDataInput;
+import com.hazelcast.nio.ObjectDataOutput;
+import com.hazelcast.nio.serialization.DataSerializable;
 
 import javax.annotation.Nonnull;
-import java.io.Serializable;
-import java.util.Random;
+import java.io.IOException;
 
-public class Employee implements Serializable, Comparable<Employee> {
-
-    public static final int MAX_AGE = 75;
-    public static final double MAX_SALARY = 1000.0;
-
-    private static final Random RANDOM = new Random();
+public class Employee implements DataSerializable, Comparable<Employee> {
 
     public int id;
     public int age;
@@ -34,22 +17,12 @@ public class Employee implements Serializable, Comparable<Employee> {
     public Employee() {
     }
 
-    public Employee(int id) {
-        this.id = id;
-        randomizeProperties();
-    }
 
-    public Employee(int id,int age, boolean active, double salary) {
+    public Employee(int id, int age, boolean active, double salary) {
         this.id = id;
         this.age = age;
         this.salary = salary;
         this.active = active;
-    }
-
-    public final void randomizeProperties() {
-        age = RANDOM.nextInt(MAX_AGE);
-        salary = RANDOM.nextDouble() * MAX_SALARY;
-        active = RANDOM.nextBoolean();
     }
 
     public int getId() {
@@ -120,5 +93,21 @@ public class Employee implements Serializable, Comparable<Employee> {
                 + ", active=" + active
                 + ", salary=" + salary
                 + '}';
+    }
+
+    @Override
+    public void writeData(ObjectDataOutput out) throws IOException {
+        out.writeInt(id);
+        out.writeInt(age);
+        out.writeDouble(salary);
+        out.writeBoolean(active);
+    }
+
+    @Override
+    public void readData(ObjectDataInput in) throws IOException {
+        id = in.readInt();
+        age = in.readInt();
+        salary = in.readDouble();
+        active = in.readBoolean();
     }
 }

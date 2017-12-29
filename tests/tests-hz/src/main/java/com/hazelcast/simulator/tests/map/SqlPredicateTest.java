@@ -66,11 +66,10 @@ public class SqlPredicateTest extends HazelcastTest {
 
     private DataSerializableEmployee generateRandomEmployee(Random random) {
         int id = random.nextInt();
-        String name = NAMES[random.nextInt(NAMES.length)];
         int age = random.nextInt(maxAge);
         boolean active = random.nextBoolean();
         double salary = random.nextDouble() * maxSalary;
-        return new DataSerializableEmployee(id, name, age, active, salary);
+        return new DataSerializableEmployee(id, age, active, salary);
     }
 
     @TimeStep

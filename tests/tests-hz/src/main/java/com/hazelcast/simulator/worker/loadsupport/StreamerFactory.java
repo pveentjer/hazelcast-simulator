@@ -17,6 +17,7 @@ package com.hazelcast.simulator.worker.loadsupport;
 
 import com.hazelcast.cache.ICache;
 import com.hazelcast.core.IMap;
+import com.hazelcast.dataset.DataSet;
 
 import javax.cache.Cache;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,6 +40,14 @@ public final class StreamerFactory {
 
     public static <K, V> Streamer<K, V> getInstance(IMap<K, V> map) {
         return getInstance(map, DEFAULT_CONCURRENCY_LEVEL);
+    }
+
+    public static <K, V> Streamer<K, V> getInstance(DataSet<K, V> map) {
+        return getInstance(map, DEFAULT_CONCURRENCY_LEVEL);
+    }
+
+    public static <K, V> Streamer<K, V> getInstance(DataSet map, int concurrencyLevel) {
+        return new AsyncDataSetStreamer<K, V>(concurrencyLevel, map);
     }
 
     public static <K, V> Streamer<K, V> getInstance(IMap<K, V> map, int concurrencyLevel) {

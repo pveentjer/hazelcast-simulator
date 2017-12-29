@@ -27,14 +27,13 @@ public class DataSerializableEmployee extends Employee implements DataSerializab
     public DataSerializableEmployee() {
     }
 
-    public DataSerializableEmployee(int id, String name, int age, boolean active, double salary) {
-        super(id, name, age, active, salary);
+    public DataSerializableEmployee(int id, int age, boolean active, double salary) {
+        super(id, age, active, salary);
     }
 
     @Override
     public void writeData(ObjectDataOutput objectDataOutput) throws IOException {
         objectDataOutput.writeInt(id);
-        objectDataOutput.writeUTF(name);
         objectDataOutput.writeInt(age);
         objectDataOutput.writeBoolean(active);
         objectDataOutput.writeDouble(salary);
@@ -43,7 +42,6 @@ public class DataSerializableEmployee extends Employee implements DataSerializab
     @Override
     public void readData(ObjectDataInput objectDataInput) throws IOException {
         id = objectDataInput.readInt();
-        name = objectDataInput.readUTF();
         age = objectDataInput.readInt();
         active = objectDataInput.readBoolean();
         salary = objectDataInput.readDouble();

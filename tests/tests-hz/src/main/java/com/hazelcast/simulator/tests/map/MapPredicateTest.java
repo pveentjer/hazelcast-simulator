@@ -87,25 +87,24 @@ public class MapPredicateTest extends HazelcastTest {
 
     @TimeStep(prob = 0.2)
     public void predicateBuilder(ThreadState state) {
-        long startMs = System.currentTimeMillis();
-
-        int age = state.randomInt(Employee.MAX_AGE);
-        String name = Employee.getRandomName();
-
-        // TODO: Still broken because it relies on reflection which is dog slow, so we need an explicit AgeNamePredicate
-        EntryObject entryObject = new PredicateBuilder().getEntryObject();
-        Predicate agePredicate = entryObject.get("age").lessThan(age);
-        Predicate ageNamePredicate = entryObject.get("name").equal(name).and(agePredicate);
-
-        Collection<Employee> employees = map.values(ageNamePredicate);
-        for (Employee emp : employees) {
-            String assertMessage = format(baseAssertMessage, emp, ageNamePredicate);
-            assertTrue(assertMessage, emp.getAge() < age);
-            assertTrue(assertMessage, emp.getName().equals(name));
-        }
-        state.operationCounter.predicateBuilderCount++;
-
-        updateStats(state, startMs);
+//        long startMs = System.currentTimeMillis();
+//
+//        int age = state.randomInt(Employee.MAX_AGE);
+//
+//        // TODO: Still broken because it relies on reflection which is dog slow, so we need an explicit AgeNamePredicate
+//        EntryObject entryObject = new PredicateBuilder().getEntryObject();
+//        Predicate agePredicate = entryObject.get("age").lessThan(age);
+//        Predicate ageNamePredicate = entryObject.get("name").equal(name).and(agePredicate);
+//
+//        Collection<Employee> employees = map.values(ageNamePredicate);
+//        for (Employee emp : employees) {
+//            String assertMessage = format(baseAssertMessage, emp, ageNamePredicate);
+//            assertTrue(assertMessage, emp.getAge() < age);
+//            assertTrue(assertMessage, emp.getName().equals(name));
+//        }
+//        state.operationCounter.predicateBuilderCount++;
+//
+//        updateStats(state, startMs);
     }
 
     @TimeStep(prob = 0.2)
