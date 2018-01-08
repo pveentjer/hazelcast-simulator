@@ -21,6 +21,6 @@ public class AsyncDataSetStreamer<K, V> extends AbstractAsyncStreamer<K, V> {
 
     @Override
     ICompletableFuture storeAsync(K key, V value) {
-        return dataSet.setAsync(key, value);
+        return dataSet.insertAsync(key, value);
     }
 }

@@ -7,6 +7,7 @@ import com.hazelcast.simulator.hz.HazelcastTest;
 import com.hazelcast.simulator.test.BaseThreadState;
 import com.hazelcast.simulator.test.annotations.Prepare;
 import com.hazelcast.simulator.test.annotations.Setup;
+import com.hazelcast.simulator.test.annotations.Teardown;
 import com.hazelcast.simulator.test.annotations.TimeStep;
 import com.hazelcast.simulator.test.annotations.Verify;
 import com.hazelcast.simulator.worker.loadsupport.Streamer;
@@ -14,6 +15,7 @@ import com.hazelcast.simulator.worker.loadsupport.StreamerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 import static org.junit.Assert.assertEquals;
 
@@ -22,20 +24,24 @@ public class DataSetTest extends HazelcastTest {
     // properties
     public int keyDomain = 1000 * 1000;
     public String sql = "age = 30 AND active = true";
-    private DataSet<Long, Employee> simpleMap;
+    public int maxAge = 75;
+    private DataSet<Long, Employee> dataset;
     private CompiledPredicate<Employee> compiledPredicate;
 
     @Setup
     public void setup() {
-        simpleMap = targetInstance.getDataSet(name);
-        compiledPredicate = simpleMap.compile(new SqlPredicate(sql));
+        dataset = targetInstance.getDataSet(name);
+        compiledPredicate = dataset.compile(new SqlPredicate(sql));
     }
 
     @Prepare(global = true)
     public void prepare() {
-        Streamer<Long, Employee> streamer = StreamerFactory.getInstance(simpleMap);
+        Streamer<Long, Employee> streamer = StreamerFactory.getInstance(dataset);
+        Random random = new Random();
         for (long k = 0; k < keyDomain; k++) {
-            streamer.pushEntry(k, new Employee());
+            Employee employee = new Employee();
+            employee.age = random.nextInt(maxAge);
+            streamer.pushEntry(k, employee);
         }
         streamer.await();
     }
@@ -45,10 +51,22 @@ public class DataSetTest extends HazelcastTest {
         compiledPredicate.execute(state.newBindings());
     }
 
+    @TimeStep(prob = 0)
+    public long count(ThreadState state) {
+        return dataset.count();
+    }
+
+
     @Verify
     public void verify() {
-        assertEquals(keyDomain, simpleMap.size());
+        assertEquals(keyDomain, dataset.count());
     }
+
+    @Teardown
+    public void destroy(){
+        System.out.println(dataset.memoryUsage());
+    }
+
 
     public class ThreadState extends BaseThreadState {
         private Map<String, Object> bindings = new HashMap<String, Object>();
