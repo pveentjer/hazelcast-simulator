@@ -73,20 +73,24 @@ public class TradeAggregationMapTest extends HazelcastTest {
 
     @Teardown
     public void tearDown() throws Exception {
-        long heapCost = 0;
+        long memoryBytes = 0;
 
         Map<Member, Future<Long>> futures = targetInstance
                 .getExecutorService("foo")
                 .submitToAllMembers(new HeapCostCallable(name));
 
         for (Future<Long> f : futures.values()) {
-            heapCost += f.get();
+            memoryBytes += f.get();
         }
 
-        logger.info("Total heapcost:" + heapCost);
-        int payloadSize = trades.size() * (TradeInfo.PAYLOAD_SIZE_BYTES+ Bits.LONG_SIZE_IN_BYTES);
+        logger.info("trades.size:"+trades.size());
+        logger.info("trades count:"+tradeCount);
+        logger.info("Total memorycost: " + memoryBytes+" bytes");
+        int payloadSize = trades.size() * (TradeInfo.PAYLOAD_SIZE_BYTES + Bits.LONG_SIZE_IN_BYTES);
         logger.info("Total payload bytes: " + payloadSize);
-        logger.info("Effectiveness: " + ((payloadSize * 100d) / heapCost) + "%");
+        logger.info("Memory Efficiency: " + ((payloadSize * 100d) / memoryBytes) + "%");
+        logger.info("Map.Entry payload size: " + (TradeInfo.PAYLOAD_SIZE_BYTES + Bits.LONG_SIZE_IN_BYTES) + " bytes");
+        logger.info("Payload size: " + (memoryBytes / tradeCount) + " bytes");
     }
 
     public static class HeapCostCallable implements Callable<Long>, HazelcastInstanceAware, Serializable {
@@ -105,7 +109,7 @@ public class TradeAggregationMapTest extends HazelcastTest {
 
         @Override
         public Long call() throws Exception {
-            return hz.getMap(mapName).getLocalMapStats().getHeapCost();
+            return hz.getMap(mapName).getLocalMapStats().getOwnedEntryMemoryCost();
         }
     }
 }

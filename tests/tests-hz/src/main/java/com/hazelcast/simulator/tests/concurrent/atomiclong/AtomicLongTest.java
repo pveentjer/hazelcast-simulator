@@ -36,12 +36,10 @@ public class AtomicLongTest extends HazelcastTest {
     public KeyLocality keyLocality = SHARED;
     public int countersLength = 1000;
 
-    private IAtomicLong totalCounter;
     private IAtomicLong[] counters;
 
     @Setup
     public void setup() {
-        totalCounter = targetInstance.getAtomicLong(name + ":TotalCounter");
         counters = new IAtomicLong[countersLength];
 
         String[] names = generateStringKeys(name, countersLength, keyLocality, targetInstance);
@@ -58,12 +56,10 @@ public class AtomicLongTest extends HazelcastTest {
     @TimeStep(prob = 0.1)
     public void write(ThreadState state) {
         state.randomCounter().incrementAndGet();
-        state.increments++;
     }
 
     public class ThreadState extends BaseThreadState {
 
-        private long increments;
 
         private IAtomicLong randomCounter() {
             int index = randomInt(counters.length);
@@ -71,34 +67,5 @@ public class AtomicLongTest extends HazelcastTest {
         }
     }
 
-    @AfterRun
-    public void afterRun(ThreadState state) {
-        totalCounter.addAndGet(state.increments);
-    }
 
-    @Verify
-    public void verify() {
-        String serviceName = totalCounter.getServiceName();
-        String totalName = totalCounter.getName();
-
-        long actual = 0;
-        for (DistributedObject distributedObject : targetInstance.getDistributedObjects()) {
-            String key = distributedObject.getName();
-            if (serviceName.equals(distributedObject.getServiceName())
-                    && key.startsWith(name)
-                    && !key.equals(totalName)) {
-                actual += targetInstance.getAtomicLong(key).get();
-            }
-        }
-
-        assertEquals(totalCounter.get(), actual);
-    }
-
-    @Teardown
-    public void teardown() {
-        for (IAtomicLong counter : counters) {
-            counter.destroy();
-        }
-        totalCounter.destroy();
-    }
 }
