@@ -13,33 +13,9 @@ public class Employee implements DataSerializable, Comparable<Employee> {
     public int age;
     public double salary;
     public boolean active;
-
-    public Employee() {
-    }
-
-
-    public Employee(int id, int age, boolean active, double salary) {
-        this.id = id;
-        this.age = age;
-        this.salary = salary;
-        this.active = active;
-    }
-
-    public int getId() {
-        return id;
-    }
-
-    public int getAge() {
-        return age;
-    }
-
-    public double getSalary() {
-        return salary;
-    }
-
-    public boolean isActive() {
-        return active;
-    }
+    public boolean useful;
+    public boolean male;
+    public boolean exConvict;
 
     @Override
     public int compareTo(@Nonnull Employee employee) {

@@ -1,53 +1,68 @@
 package com.hazelcast.simulator.tests.dataset;
 
-import com.hazelcast.nio.ObjectDataInput;
-import com.hazelcast.nio.ObjectDataOutput;
-import com.hazelcast.nio.serialization.DataSerializable;
+import com.hazelcast.nio.serialization.Portable;
+import com.hazelcast.nio.serialization.PortableReader;
+import com.hazelcast.nio.serialization.PortableWriter;
 
 import java.io.IOException;
 
-public class TradeInfo implements DataSerializable {
+/**
+ * A TradeInfo contains exactly 20 bytes of content.
+ */
+public class TradeInfo implements Portable {
+
+    public final static int PAYLOAD_SIZE_BYTES = 20;
 
     public long tradeId;
 
     // the person making the thread
-    public int clientId;
+    public char clientId;
 
     // venue is a particular trading platform, e.g. the NY stock exchange
     // venue code can be used to route on
-    public int venueCode;
+    public byte venueCode;
 
     // the code of the tradeable asset. E.g. gold
-    public int instrumentCode;
+    public char instrumentCode;
 
     // the total price of the trade.
-    public long price;
+    public int price;
 
     // the number of items to trade
-    public long quantity;
+    public char quantity;
 
-    // buy or sell.
-    public char side;
+    // if it is a buy or sell
+    public boolean side;
 
     @Override
-    public void writeData(ObjectDataOutput out) throws IOException {
-        out.writeLong(tradeId);
-        out.writeInt(clientId);
-        out.writeInt(venueCode);
-        out.writeInt(instrumentCode);
-        out.writeLong(price);
-        out.writeLong(quantity);
-        out.writeChar(side);
+    public int getFactoryId() {
+        return TradeInfoPortableFactory.FACTORY_ID;
     }
 
     @Override
-    public void readData(ObjectDataInput in) throws IOException {
-        this.tradeId = in.readLong();
-        this.clientId = in.readInt();
-        this.venueCode = in.readInt();
-        this.instrumentCode = in.readInt();
-        this.price = in.readLong();
-        this.quantity = in.readLong();
-        this.side = in.readChar();
+    public int getClassId() {
+        return TradeInfoPortableFactory.TRADE_INFO;
+    }
+
+    @Override
+    public void writePortable(PortableWriter writer) throws IOException {
+        writer.writeLong("tradeId", tradeId);
+        writer.writeChar("clientId", clientId);
+        writer.writeByte("venueCode", venueCode);
+        writer.writeChar("instrumentCode", instrumentCode);
+        writer.writeInt("price", price);
+        writer.writeChar("quantity", quantity);
+        writer.writeBoolean("side", side);
+    }
+
+    @Override
+    public void readPortable(PortableReader reader) throws IOException {
+        tradeId = reader.readLong("tradeId");
+        clientId = reader.readChar("clientId");
+        venueCode = reader.readByte("venueCode");
+        instrumentCode = reader.readChar("instrumentCode");
+        price = reader.readInt("price");
+        quantity = reader.readChar("quantity");
+        side = reader.readBoolean("side");
     }
 }
