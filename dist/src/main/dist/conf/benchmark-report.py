@@ -859,7 +859,6 @@ class Session:
     src_dir = ""
     workers = None
     name = ""
-
     # contains the first and last moment of all tests over all workers
     start_time = None
     end_time = None
@@ -907,16 +906,14 @@ class Session:
                     ts_list = []
                     throughput_aggregated_per_test[test_id] = ts_list
                 run = worker.performanceLog.runs[test_id]
-                if self.start_time is None or self.start_time>run.start_time:
+                if self.start_time is None or run.start_time < self.start_time:
                     self.start_time = run.start_time
-                if self.end_time is None or self.end_time > run.end_time:
+                if self.end_time is None or run.end_time > self.end_time:
                     self.end_time = run.end_time
                 ts_list.append(run.handle.load())
 
         # aggregates throughput per test
         for test_id in throughput_aggregated_per_test.keys():
-            print("test_id:" + test_id)
-
             def getter():
                 return Series("", "", False, False, ts_list=throughput_aggregated_per_test[test_id]).items
 
@@ -982,8 +979,8 @@ class Comparison:
                 exit(1)
 
             for handle in session.handles:
-                #handle.start_time = session.start_time
-                #handle.end_time = session.end_time
+                handle.start_time = session.start_time
+                handle.end_time = session.end_time
                 plot = self.plots.get(handle.name)
                 if not plot:
                     if handle.src == "latency-distribution":
