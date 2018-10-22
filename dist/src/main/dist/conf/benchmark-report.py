@@ -813,7 +813,7 @@ class WorkerRun:
 
 # Analyzes the perform.csv for a worker.
 class PerformanceLogAnalyzer:
-    agent_benchmark_periods = None
+    periods = None
 
     def __init__(self, worker_dir, worker_name):
         self.runs = {}
@@ -829,10 +829,14 @@ class PerformanceLogAnalyzer:
                 next(csvreader)
                 for row in csvreader:
                     test_id = row[2]
+                    epoch = row[0]
                     run = self.runs.get(test_id)
                     if run is None:
                         run = WorkerRun(test_id)
+                        run.start_time = epoch
                         self.runs[test_id] = run
+                    if run.end_time < epoch:
+                        run.end_time = epoch
                     run.key_values.append(KeyValue(row[0], row[5]))
 
 
@@ -846,17 +850,9 @@ class Worker:
         self.performanceLog = PerformanceLogAnalyzer(self.worker_dir, self.name)
         self.handles = []
         for k in self.performanceLog.runs:
-            # print("adding handle:"+k)
             self.handles.append(self.performanceLog.runs[k].handle)
-
         self.handles.extend(GcAnalyzer(self.worker_dir).analyze())
         self.handles.extend(HdrAnalyzer(self.worker_dir).analyze())
-
-
-class Period:
-    def __init__(self, start_time, end_time):
-        self.start_time = start_time
-        self.end_time = end_time
 
 
 class Session:
@@ -865,15 +861,31 @@ class Session:
     workers = None
     name = ""
 
+    # contains the first and last moment of all tests over all workers
+    start_time = None
+    end_time = None
+
     def __init__(self, src_dir, name):
         self.src_dir = src_dir
         self.name = name
         self.handles = []
+        self._load_workers()
+        self._load_agents()
+        self._analyze_aggregated_throughput()
+        self.handles.extend(DstatAnalyzer(src_dir).analyze())
+        self.handles.extend(HdrAnalyzer(src_dir).analyze())
 
-        # load all workers
+    def _load_agents(self):
+        agents = {}
+        for worker in self.workers:
+            agent = agent_for_worker(worker.name)
+            if not agents.get(agent):
+                agents[agent] = worker
+
+    def _load_workers(self):
         self.workers = []
-        for subdir_name in os.listdir(src_dir):
-            subdir = os.path.join(src_dir, subdir_name)
+        for subdir_name in os.listdir(self.src_dir):
+            subdir = os.path.join(self.src_dir, subdir_name)
             if not os.path.isdir(subdir):
                 continue
             if not subdir_name.startswith("A"):
@@ -885,8 +897,9 @@ class Session:
             print("Invalid Benchmark " + self.name + " from directory [" + self.src_dir + "]; no workers found")
             exit(1)
 
+    def _analyze_aggregated_throughput(self):
         # groups all the throughput information per test.
-        # todo: the problem is that the throughput information is now pulled into memory
+        # todo: the problem is that the throughput information is now pulled into memory again (copied)
         throughput_aggregated_per_test = {}
         for worker in self.workers:
             for test_id in worker.performanceLog.runs.keys():
@@ -894,41 +907,23 @@ class Session:
                 if ts_list is None:
                     ts_list = []
                     throughput_aggregated_per_test[test_id] = ts_list
-                ts_list.append(worker.performanceLog.runs[test_id].handle.load())
+                run = worker.performanceLog.runs[test_id]
+                if self.start_time is None or self.start_time>run.start_time:
+                    self.start_time = run.start_time
+                if self.end_time is None or self.end_time > run.end_time:
+                    self.end_time = run.end_time
+                ts_list.append(run.handle.load())
 
-        # adds
+        # aggregates throughput per test
         for test_id in throughput_aggregated_per_test.keys():
             print("test_id:" + test_id)
 
             def getter():
                 return Series("", "", False, False, ts_list=throughput_aggregated_per_test[test_id]).items
 
-            handle = SeriesHandle("throughput", "throughput_" + test_id, "Throughput", "Operations/sec",
-                                  getter)
-
+            handle = SeriesHandle("throughput", "throughput_" + test_id, "Throughput", "Operations/sec", getter)
             handle.metadata["test"] = test_id
             self.handles.append(handle)
-
-        self.handles.extend(DstatAnalyzer(src_dir).analyze())
-        self.handles.extend(HdrAnalyzer(src_dir).analyze())
-
-        agents = {}
-        for worker in self.workers:
-            agent = agent_for_worker(worker.name)
-            if not agents.get(agent):
-                agents[agent] = worker
-
-    # todo: better name
-    def x(self, handle):
-        return handle.load().items
-
-    # def aggregated_throughput(self, testId):
-    #     ts_list = []
-    #     for worker in self.workers:
-    #         for run in worker.performanceLog.runs:
-    #             if handle.src == "throughput":
-    #                 ts_list.append(handle.load())
-    #     return
 
 
 class Comparison:
@@ -939,8 +934,6 @@ class Comparison:
         session_dirs = []
         session_names = {}
         last_session = None
-
-        print("Loading benchmarks")
 
         # collect all benchmark directories and the names for the benchmarks
         for session_arg in session_args:
@@ -966,7 +959,6 @@ class Comparison:
             cmd = simulator_home + "/conf/hdr.sh " + session_dir
             subprocess.check_output(cmd.split())
             self.sessions.append(Session(session_dir, session_names[session_dir]))
-        print("finished collecting benchmark data")
 
     def output_dir(self, name):
         output_dir = os.path.join(report_dir, name)
@@ -978,9 +970,7 @@ class Comparison:
 
         # plot benchmark/machine level metrics
         self.add_session_level_metrics()
-
         self.add_worker_level_metrics()
-
         for plot in self.plots.values():
             plot.plot()
 
@@ -995,7 +985,6 @@ class Comparison:
                 exit(1)
 
             for handle in session.handles:
-                print(" benchmark level metrics handle.name:" + handle.name + " handle.src")
                 plot = self.plots.get(handle.name)
                 if not plot:
                     if handle.src == "latency-distribution":
@@ -1014,11 +1003,9 @@ class Comparison:
         for session in self.sessions:
             for worker in session.workers:
                 for handle in worker.handles:
-                    print("worker level metrics handle.name:" + handle.name + " handle.src")
-
-                    # todo: we need to differentiate on test.
                     if handle.src == "throughput":
-                        x = "throughput_"+handle.metadata["test"]+"_per_worker"
+                        # todo: better name
+                        x = "throughput_" + handle.metadata["test"] + "_per_worker"
                         plot = self.plots.get(x)
                         if not plot:
                             plot = TimeseriesGnuplot(self.output_dir(handle.src),
