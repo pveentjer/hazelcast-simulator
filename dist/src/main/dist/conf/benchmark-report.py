@@ -429,6 +429,8 @@ class KeyValue:
 # into memory. Since we could have a lot of measured data, we want to prevent getting it all in memory.
 class SeriesHandle:
     metadata = None
+    start_time = None
+    end_time = None
 
     def __init__(self,
                  src,
@@ -452,14 +454,11 @@ class SeriesHandle:
         self.is_bytes = is_bytes
         self.is_points = is_points
 
-    def period(self, period):
-        self.start_time = period.start_time
-        self.end_time = period.end_time
-
     def load(self):
         items = self.load_method(*self.args)
         series = Series(self.name, self.ylabel, self.is_bytes, self.is_points, items=items)
-        # series.trim(self.start_time, self.end_time)
+        if not self.start_time is None:
+            series.trim(self.start_time, self.end_time)
         return series
 
 
@@ -960,17 +959,15 @@ class Comparison:
             subprocess.check_output(cmd.split())
             self.sessions.append(Session(session_dir, session_names[session_dir]))
 
-    def output_dir(self, name):
+    def _output_dir(self, name):
         output_dir = os.path.join(report_dir, name)
         ensure_dir(output_dir)
         return output_dir
 
-    # should be renamed
-    def compare(self):
+    def report(self):
+        self._add_session_plots()
+        self._add_worker_plots()
 
-        # plot benchmark/machine level metrics
-        self.add_session_level_metrics()
-        self.add_worker_level_metrics()
         for plot in self.plots.values():
             plot.plot()
 
@@ -978,37 +975,41 @@ class Comparison:
         for session in self.sessions:
             print(" benchmark [" + session.name + "] benchmark.dir [" + session.src_dir + "]")
 
-    def add_session_level_metrics(self):
+    def _add_session_plots(self):
         for session in self.sessions:
             if len(session.handles) == 0:
                 print(" benchmark [" + session.name + "] benchmark.dir [" + session.src_dir + "] has no data")
                 exit(1)
 
             for handle in session.handles:
+                #handle.start_time = session.start_time
+                #handle.end_time = session.end_time
                 plot = self.plots.get(handle.name)
                 if not plot:
                     if handle.src == "latency-distribution":
-                        plot = LatencyDistributionGnuplot(self.output_dir("latency"), handle.title)
+                        plot = LatencyDistributionGnuplot(self._output_dir("latency"), handle.title)
                     else:
-                        plot = TimeseriesGnuplot(self.output_dir(handle.src), handle.title)
+                        plot = TimeseriesGnuplot(self._output_dir(handle.src), handle.title)
 
                     self.plots[handle.name] = plot
 
                 plot.add(handle.load(), title=session.name)
 
-    def add_worker_level_metrics(self):
+    def _add_worker_plots(self):
         if not args.full:
             return
 
         for session in self.sessions:
             for worker in session.workers:
                 for handle in worker.handles:
+                    handle.start_time = session.start_time
+                    handle.end_time = session.end_time
                     if handle.src == "throughput":
                         # todo: better name
                         x = "throughput_" + handle.metadata["test"] + "_per_worker"
                         plot = self.plots.get(x)
                         if not plot:
-                            plot = TimeseriesGnuplot(self.output_dir(handle.src),
+                            plot = TimeseriesGnuplot(self._output_dir(handle.src),
                                                      "Throughput per worker",
                                                      basefilename=x)
                             self.plots[x] = plot
@@ -1023,17 +1024,17 @@ class Comparison:
                         title = worker.name + " " + handle.title
                         if not plot:
                             if handle.src == "latency-distribution":
-                                plot = LatencyDistributionGnuplot(self.output_dir("latency"), title,
+                                plot = LatencyDistributionGnuplot(self._output_dir("latency"), title,
                                                                   basefilename=name)
                             else:
-                                plot = TimeseriesGnuplot(self.output_dir(handle.src), title, basefilename=name)
+                                plot = TimeseriesGnuplot(self._output_dir(handle.src), title, basefilename=name)
                             self.plots[name] = plot
 
                         plot.add(handle.load(), session.name)
 
 
 comparison = Comparison()
-comparison.compare()
+comparison.report()
 
 if not args.full and gc_logs_found:
     print("gc.log files have been found. Run with -f option to get these plotted.")
