@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # todo:
+# - todo: only 1 aggregated throughput is shown
 # - writing html
 # - if no latency info is found; print warning
 # - when not a lot of data points, them time issues in gnuplot (use WORKER_PERFORMANCE_MONITOR_INTERVAL_SECONDS=default)
@@ -9,6 +10,7 @@
 # - gnuplot y axis formatting; long numbers are unreadable because not dots or comma's
 # - gc aggregated
 # - hdr
+# - verbose option
 
 # backlog
 # - google chart option
@@ -36,6 +38,7 @@ parser.add_argument('-w', '--warmup', nargs=1, default=[0], type=int,
 parser.add_argument('-c', '--cooldown', nargs=1, default=[0], type=int,
                     help='The cooldown period in seconds. The cooldown removes datapoints from the end.')
 parser.add_argument('-f', '--full', help='Enable individual worker level diagrams.', action="store_true")
+parser.add_argument('-v', '--verbose', help='Verbose output.', action="store_true")
 parser.add_argument('--svg', help='SVG instead of PNG graphics.', action="store_true")
 
 args = parser.parse_args()
@@ -53,16 +56,18 @@ report_dir = os.path.abspath(report_dir)
 
 warmup = int(args.warmup[0])
 cooldown = int(args.cooldown[0])
+verbose = args.verbose
 
+print("Benchmark report generator")
 print("Report directory '" + report_dir + "'")
-
+print("Warmup " + str(warmup) + " seconds")
+print("Cooldown " + str(cooldown) + " seconds")
 
 # ================ utils ========================
 
 def dump(obj):
     for attr in dir(obj):
-        print
-        "obj.%s = %s" % (attr, getattr(obj, attr))
+        print("obj.%s = %s" % (attr, getattr(obj, attr)))
 
 
 def ensure_dir(file_path):
@@ -146,7 +151,8 @@ class Gnuplot:
                 break
 
         if empty:
-            print("Skipping plot of " + self.title + "; empty time series")
+            if verbose:
+                print("Skipping plot of " + self.title + "; empty time series")
             return
 
         ts_first = self.ts_list[0]
@@ -170,7 +176,8 @@ class Gnuplot:
         self.script_file = open(script_path, "w")
         self._plot()
 
-        print(self.image_path)
+        if verbose:
+            print(self.image_path)
 
     def _plot(self):
         raise NotImplementedError("Please Implement this method")
@@ -229,12 +236,12 @@ class TimeseriesGnuplot(Gnuplot):
                 if color:
                     lc = "lc rgb \"" + color + "\""
                 self._write(
-                    "   \'" + ts_file.name + "\' using (t0(timecolumn(1))):2 " + title_str + " with points " + lc + ", \\")
+                    "   \'" + ts_file.name + "\' using 1:2 " + title_str + " with points " + lc + ", \\")
             else:
                 lt = ""
                 if color:
                     lt = "lt rgb \"" + color + "\""
-                self._write("   \'" + ts_file.name + "\' using (t0(timecolumn(1))):2 " + title_str + " " + lt + ", \\")
+                self._write("   \'" + ts_file.name + "\' using 1:2 " + title_str + " " + lt + ", \\")
         self._complete()
 
 
@@ -314,8 +321,7 @@ class GoogleCharts:
 
         with open(filepath, 'w') as f:
             f.write(chart)
-        print
-        filepath
+        print(filepath)
 
 
 seriesCounter = Counter()
@@ -405,13 +411,25 @@ class Series:
 
     # Removes all items from this time series that are not in between the start/end-time.
     def trim(self, start_time, end_time):
+        if start_time is None:
+            return
+
         new_items = []
+        start = float(start_time)
+        end = float(end_time)
         for item in self.items:
-            if start_time is not None and float(item.time) < float(start_time):
-                continue
-            if end_time is not None and float(item.time) > float(end_time):
-                continue
-            new_items.append(item)
+            item_time = float(item.time)
+            if start <= item_time <= end:
+                new_items.append(item)
+
+        self.items = new_items
+
+    def rebase(self, time):
+        new_items = []
+        t = float(time)
+        for item in self.items:
+            item_time = float(item.time)
+            new_items.append(KeyValue(str(item_time - t), item.value))
         self.items = new_items
 
 
@@ -431,9 +449,10 @@ class SeriesHandle:
     metadata = None
     start_time = None
     end_time = None
+    rebase_time = None
 
     def __init__(self,
-                 src,
+                 type,
                  name,
                  title,
                  ylabel,
@@ -445,7 +464,7 @@ class SeriesHandle:
             args = []
 
         self.metadata = {}
-        self.src = src
+        self.type = type
         self.name = name
         self.title = title
         self.ylabel = ylabel
@@ -457,8 +476,13 @@ class SeriesHandle:
     def load(self):
         items = self.load_method(*self.args)
         series = Series(self.name, self.ylabel, self.is_bytes, self.is_points, items=items)
-        if not self.start_time is None:
+
+        if self.start_time is not None:
             series.trim(self.start_time, self.end_time)
+
+        # this is where we remove the absolute time part.
+        if self.rebase_time is not None:
+            series.rebase(self.rebase_time)
         return series
 
 
@@ -812,7 +836,7 @@ class WorkerRun:
 
 # Analyzes the perform.csv for a worker.
 class PerformanceLogAnalyzer:
-    periods = None
+    runs = None
 
     def __init__(self, worker_dir, worker_name):
         self.runs = {}
@@ -821,22 +845,24 @@ class PerformanceLogAnalyzer:
 
         performance_csv = os.path.join(self.worker_dir, "performance.csv")
 
-        if os.path.exists(performance_csv):
-            with open(performance_csv, 'rb') as csvfile:
-                csvreader = csv.reader(csvfile, delimiter=',', quotechar='|')
-                # skip the first line since it contains the header.
-                next(csvreader)
-                for row in csvreader:
-                    test_id = row[2]
-                    epoch = row[0]
-                    run = self.runs.get(test_id)
-                    if run is None:
-                        run = WorkerRun(test_id)
-                        run.start_time = epoch
-                        self.runs[test_id] = run
-                    if run.end_time < epoch:
-                        run.end_time = epoch
-                    run.key_values.append(KeyValue(row[0], row[5]))
+        if not os.path.exists(performance_csv):
+            return
+
+        with open(performance_csv, 'rb') as csvfile:
+            csvreader = csv.reader(csvfile, delimiter=',', quotechar='|')
+            # skip the first line since it contains the header.
+            next(csvreader)
+            for row in csvreader:
+                test_id = row[2]
+                epoch = float(row[0])
+                run = self.runs.get(test_id)
+                if run is None:
+                    run = WorkerRun(test_id)
+                    run.start_time = epoch
+                    self.runs[test_id] = run
+                if run.end_time < epoch:
+                    run.end_time = epoch
+                run.key_values.append(KeyValue(row[0], row[5]))
 
 
 class Worker:
@@ -850,12 +876,18 @@ class Worker:
         self.handles = []
         for k in self.performanceLog.runs:
             self.handles.append(self.performanceLog.runs[k].handle)
-        self.handles.extend(GcAnalyzer(self.worker_dir).analyze())
-        self.handles.extend(HdrAnalyzer(self.worker_dir).analyze())
+        #self.handles.extend(GcAnalyzer(self.worker_dir).analyze())
+        #self.handles.extend(HdrAnalyzer(self.worker_dir).analyze())
 
+
+class Period:
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
 
 class Session:
     # the directory where the original files can be found
+    handles = None
     src_dir = ""
     workers = None
     name = ""
@@ -870,8 +902,22 @@ class Session:
         self._load_workers()
         self._load_agents()
         self._analyze_aggregated_throughput()
-        self.handles.extend(DstatAnalyzer(src_dir).analyze())
-        self.handles.extend(HdrAnalyzer(src_dir).analyze())
+        #self.handles.extend(DstatAnalyzer(src_dir).analyze())
+        #self.handles.extend(HdrAnalyzer(src_dir).analyze())
+
+    def period(self, test_id):
+        start_time = None
+        end_time = None
+        for worker in self.workers:
+            run = worker.performanceLog.runs.get(test_id)
+            if run is None:
+                continue
+            if start_time is None or start_time < run.start_time:
+                start_time = run.start_time
+            if end_time is None or end_time > run.end_time:
+                end_time = run.end_time
+
+        return Period(start_time, end_time)
 
     def _load_agents(self):
         agents = {}
@@ -917,10 +963,9 @@ class Session:
             def getter():
                 return Series("", "", False, False, ts_list=throughput_aggregated_per_test[test_id]).items
 
-            handle = SeriesHandle("throughput", "throughput_" + test_id, "Throughput", "Operations/sec", getter)
+            handle = SeriesHandle("throughput", "aggregated_throughput_" + test_id, "Throughput", "Operations/sec", getter)
             handle.metadata["test"] = test_id
             self.handles.append(handle)
-
 
 class Comparison:
     plots = None
@@ -952,8 +997,8 @@ class Comparison:
         # Make the benchmarks
         self.sessions = []
         for session_dir in session_dirs:
-            cmd = simulator_home + "/conf/hdr.sh " + session_dir
-            subprocess.check_output(cmd.split())
+            #cmd = simulator_home + "/conf/hdr.sh " + session_dir
+            #subprocess.check_output(cmd.split())
             self.sessions.append(Session(session_dir, session_names[session_dir]))
 
     def _output_dir(self, name):
@@ -961,7 +1006,8 @@ class Comparison:
         ensure_dir(output_dir)
         return output_dir
 
-    def report(self):
+    def make_report(self):
+        self._fix_ts_time()
         self._add_session_plots()
         self._add_worker_plots()
 
@@ -972,6 +1018,25 @@ class Comparison:
         for session in self.sessions:
             print(" benchmark [" + session.name + "] benchmark.dir [" + session.src_dir + "]")
 
+    def _fix_ts_time(self):
+        for session in self.sessions:
+            for worker in session.workers:
+                for handle in worker.handles:
+                    self._fix_time_handle(handle, session)
+            for handle in session.handles:
+                self._fix_time_handle(handle, session)
+
+    def _fix_time_handle(self, handle, session):
+        test_id = handle.metadata.get("test")
+        handle.rebase_time = session.start_time
+        if test_id is not None:
+            test_period = session.period(test_id)
+            handle.start_time = test_period.start + warmup
+            handle.end_time = test_period.end - cooldown
+        else:
+            handle.start_time = session.start_time + warmup
+            handle.end_time = session.end_time - cooldown
+
     def _add_session_plots(self):
         for session in self.sessions:
             if len(session.handles) == 0:
@@ -979,14 +1044,13 @@ class Comparison:
                 exit(1)
 
             for handle in session.handles:
-                handle.start_time = session.start_time
-                handle.end_time = session.end_time
                 plot = self.plots.get(handle.name)
+                print("handle.name: "+handle.name+" handle.type:"+handle.type)
                 if not plot:
-                    if handle.src == "latency-distribution":
+                    if handle.type == "latency-distribution":
                         plot = LatencyDistributionGnuplot(self._output_dir("latency"), handle.title)
                     else:
-                        plot = TimeseriesGnuplot(self._output_dir(handle.src), handle.title)
+                        plot = TimeseriesGnuplot(self._output_dir(handle.type), handle.title)
 
                     self.plots[handle.name] = plot
 
@@ -999,17 +1063,15 @@ class Comparison:
         for session in self.sessions:
             for worker in session.workers:
                 for handle in worker.handles:
-                    handle.start_time = session.start_time
-                    handle.end_time = session.end_time
-                    if handle.src == "throughput":
+                    if handle.type == "throughput":
                         # todo: better name
-                        x = "throughput_" + handle.metadata["test"] + "_per_worker"
-                        plot = self.plots.get(x)
+                        id = "throughput_" + handle.metadata["test"] + "_per_worker"
+                        plot = self.plots.get(id)
                         if not plot:
-                            plot = TimeseriesGnuplot(self._output_dir(handle.src),
-                                                     "Throughput per worker",
-                                                     basefilename=x)
-                            self.plots[x] = plot
+                            plot = TimeseriesGnuplot(self._output_dir(handle.type),
+                                                     "Throughput_____ per worker",
+                                                     basefilename=id)
+                            self.plots[id] = plot
 
                         if len(self.sessions) > 1:
                             plot.add(handle.load(), session.name + "_" + worker.name)
@@ -1020,18 +1082,18 @@ class Comparison:
                         plot = self.plots.get(name)
                         title = worker.name + " " + handle.title
                         if not plot:
-                            if handle.src == "latency-distribution":
+                            if handle.type == "latency-distribution":
                                 plot = LatencyDistributionGnuplot(self._output_dir("latency"), title,
                                                                   basefilename=name)
                             else:
-                                plot = TimeseriesGnuplot(self._output_dir(handle.src), title, basefilename=name)
+                                plot = TimeseriesGnuplot(self._output_dir(handle.type), title, basefilename=name)
                             self.plots[name] = plot
 
                         plot.add(handle.load(), session.name)
 
 
 comparison = Comparison()
-comparison.report()
+comparison.make_report()
 
 if not args.full and gc_logs_found:
     print("gc.log files have been found. Run with -f option to get these plotted.")
