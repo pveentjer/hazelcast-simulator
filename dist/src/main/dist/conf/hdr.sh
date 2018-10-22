@@ -7,8 +7,9 @@ set -e
 # printing the command being executed (useful for debugging)
 #set -x
 
-# the session id; could be a * om case everything needs to be downloaded
+# the session id; could be a * in case everything needs to be downloaded
 session_dir=$1
+result_dir=$2
 
 # merge all hdr files of each member into a hdr file which gets stored in the target_directory
 probes=($(ls -R ${session_dir} | grep .hdr | sort | uniq))

@@ -48,7 +48,7 @@ public final class TestPerformanceTracker {
 
     private final TestContainer testContainer;
     private final Map<String, HistogramLogWriter> histogramLogWriterMap = new HashMap<String, HistogramLogWriter>();
-    private final PerformanceLogWriter performanceLogWriter;
+    private final String testId;
     private long lastUpdateMillis;
     private Map<String, Histogram> intervalHistogramMap;
 
@@ -65,8 +65,7 @@ public final class TestPerformanceTracker {
 
     public TestPerformanceTracker(TestContainer container) {
         this.testContainer = container;
-        this.performanceLogWriter = new PerformanceLogWriter(
-                new File(getUserDir(), "performance-" + container.getTestCase().getId() + ".csv"));
+        this.testId = testContainer.getTestCase().getId();
     }
 
     private long startMeasuringTime() {
@@ -175,20 +174,9 @@ public final class TestPerformanceTracker {
         this.lastUpdateMillis = currentTimeMillis;
     }
 
-    long intervalOperationCount() {
-        return intervalOperationCount;
-    }
-
-    long totalOperationCount() {
-        return totalOperationCount;
-    }
-
-    double intervalThroughput() {
-        return intervalThroughput;
-    }
-
-    void persist(long currentTimeMillis, String currentTimeString) {
-        performanceLogWriter.write(
+    void write(long currentTimeMillis, String currentTimeString, PerformanceLog performanceLog) {
+        performanceLog.write(
+                testId,
                 currentTimeMillis,
                 currentTimeString,
                 totalOperationCount,

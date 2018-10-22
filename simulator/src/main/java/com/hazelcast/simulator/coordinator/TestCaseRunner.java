@@ -334,17 +334,7 @@ public final class TestCaseRunner {
         log(format("Starting run on %s workers", targetType.toString(targetCount)));
         log(format("Test run using workers %s", WorkerData.toAddressString(targets)));
 
-        recordTimestamp("start");
-
         return submitToTargets(false, new StartPhaseOperation(RUN, testCase.getId()));
-    }
-
-    private void recordTimestamp(String label) {
-        String startScript = getConfigurationFile("record_timestamp.sh").getAbsolutePath();
-        new BashCommand(startScript)
-                .addParams(publicAddressesString(registry), coordinatorParameters.getSessionId(), testCase.getId(), label)
-                .addEnvironment(coordinatorParameters.getSimulatorProperties().asMap())
-                .execute();
     }
 
     private void stopRun() {
@@ -358,8 +348,6 @@ public final class TestCaseRunner {
         } catch (TestCaseAbortedException e) {
             log(e.getMessage());
         }
-
-        recordTimestamp("stop");
     }
 
     private void logProgress(long elapsedMs, long durationMs) {

@@ -25,23 +25,24 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 /**
  * Responsible for writing to performance stats to disk in csv format.
  */
-final class PerformanceLogWriter {
+final class PerformanceLog {
 
     private final StringBuffer sb = new StringBuffer();
     private final DecimalFormat format = new DecimalFormat("#.###");
     private final File file;
     private boolean headerWritten;
 
-    PerformanceLogWriter(File file) {
+    PerformanceLog(File file) {
         this.file = checkNotNull(file, "file can't be null");
     }
 
     private void writeHeader() {
-        String columns = "epoch,timestamp,operations,operations-delta,operations/second\n";
+        String columns = "epoch,timestamp,testCaseId,operations,operations-delta,operations/second\n";
         appendText(columns, file);
     }
 
-    void write(long timeMillis,
+    void write(String testCaseId,
+               long timeMillis,
                String timestamp,
                long operationsTotal,
                long operationsDelta,
@@ -56,6 +57,7 @@ final class PerformanceLogWriter {
         // ms are expressed in epoch time after the decimal point
         sb.append(format.format(timeMillis * 1d / SECONDS.toMillis(1)));
         sb.append(',').append(timestamp);
+        sb.append(',').append(testCaseId);
         sb.append(',').append(operationsTotal);
         sb.append(',').append(operationsDelta);
         sb.append(',').append(format.format(operationsPerSecond));

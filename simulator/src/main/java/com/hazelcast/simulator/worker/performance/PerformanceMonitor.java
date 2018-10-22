@@ -94,7 +94,7 @@ public class PerformanceMonitor implements Closeable {
     private final class PerformanceMonitorThread extends Thread {
 
         private final long scanIntervalNanos = SECONDS.toNanos(1);
-        private final PerformanceLogWriter globalPerformanceLogWriter;
+        private final PerformanceLog performanceLog;
         private final SimpleDateFormat simpleDateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
         private final long updateIntervalMillis;
         private final List<TestContainer> dirtyContainers = new ArrayList<TestContainer>();
@@ -103,7 +103,7 @@ public class PerformanceMonitor implements Closeable {
             super("WorkerPerformanceMonitor");
             setDaemon(true);
             this.updateIntervalMillis = SECONDS.toMillis(updateIntervalSeconds);
-            this.globalPerformanceLogWriter = new PerformanceLogWriter(new File(getUserDir(), "performance.csv"));
+            this.performanceLog = new PerformanceLog(new File(getUserDir(), "performance.csv"));
         }
 
         @Override
@@ -159,26 +159,11 @@ public class PerformanceMonitor implements Closeable {
 
         private void persist(long currentTimestamp) {
             String dateString = simpleDateFormat.format(new Date(currentTimestamp));
-            long globalIntervalOperationCount = 0;
-            long globalOperationsCount = 0;
-            double globalIntervalThroughput = 0;
 
             for (TestContainer container : dirtyContainers) {
                 TestPerformanceTracker tracker = container.getTestPerformanceTracker();
-                tracker.persist(currentTimestamp, dateString);
-
-                globalIntervalOperationCount += tracker.intervalOperationCount();
-                globalOperationsCount += tracker.totalOperationCount();
-                globalIntervalThroughput += tracker.intervalThroughput();
+                tracker.write(currentTimestamp, dateString, performanceLog);
             }
-
-            // global performance stats
-            globalPerformanceLogWriter.write(
-                    currentTimestamp,
-                    dateString,
-                    globalOperationsCount,
-                    globalIntervalOperationCount,
-                    globalIntervalThroughput);
         }
     }
 }

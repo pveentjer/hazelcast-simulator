@@ -39,7 +39,7 @@ parser.add_argument('-f', '--full', help='Enable individual worker level diagram
 parser.add_argument('--svg', help='SVG instead of PNG graphics.', action="store_true")
 
 args = parser.parse_args()
-benchmark_args = args.benchmarks
+session_args = args.benchmarks
 
 gc_logs_found = False
 
@@ -61,7 +61,8 @@ print("Report directory '" + report_dir + "'")
 
 def dump(obj):
     for attr in dir(obj):
-        print "obj.%s = %s" % (attr, getattr(obj, attr))
+        print
+        "obj.%s = %s" % (attr, getattr(obj, attr))
 
 
 def ensure_dir(file_path):
@@ -313,10 +314,12 @@ class GoogleCharts:
 
         with open(filepath, 'w') as f:
             f.write(chart)
-        print filepath
+        print
+        filepath
 
 
 seriesCounter = Counter()
+
 
 # a series is a list of key/values. It could be a time series where the key is the time and the value
 # is the measured value e.g. cpu usage.
@@ -425,11 +428,21 @@ class KeyValue:
 # A handle to a series. With a handle you can refer to a series, without needing to pull it
 # into memory. Since we could have a lot of measured data, we want to prevent getting it all in memory.
 class SeriesHandle:
-    def __init__(self, src, name, title, ylabel, load_method,
-                 args=None, is_bytes=False, is_points=False, start_time=None, end_time=None):
+    metadata = None
+
+    def __init__(self,
+                 src,
+                 name,
+                 title,
+                 ylabel,
+                 load_method,
+                 args=None,
+                 is_bytes=False,
+                 is_points=False):
         if not args:
             args = []
 
+        self.metadata = {}
         self.src = src
         self.name = name
         self.title = title
@@ -438,8 +451,6 @@ class SeriesHandle:
         self.args = args
         self.is_bytes = is_bytes
         self.is_points = is_points
-        self.start_time = start_time
-        self.end_time = end_time
 
     def period(self, period):
         self.start_time = period.start_time
@@ -448,7 +459,7 @@ class SeriesHandle:
     def load(self):
         items = self.load_method(*self.args)
         series = Series(self.name, self.ylabel, self.is_bytes, self.is_points, items=items)
-        series.trim(self.start_time, self.end_time)
+        # series.trim(self.start_time, self.end_time)
         return series
 
 
@@ -501,12 +512,14 @@ class HdrAnalyzer:
                 SeriesHandle("latency", "latency_interval_mean_" + name, "Interval Mean", "Latency (μs)",
                              self._load_latency_ts, args=[file_path, 13]))
             handles.append(
-                SeriesHandle("latency", "latency_interval_std_deviation_" + name, "Interval Standard Deviation", "Latency (μs)",
+                SeriesHandle("latency", "latency_interval_std_deviation_" + name, "Interval Standard Deviation",
+                             "Latency (μs)",
                              self._load_latency_ts, args=[file_path, 14]))
 
             hgrm_path = os.path.join(self.directory, file_name + ".hgrm")
             handles.append(
-                SeriesHandle("latency-distribution", "latency_distribution_" + name, "Latency distribution", "Latency (μs)",
+                SeriesHandle("latency-distribution", "latency_distribution_" + name, "Latency distribution",
+                             "Latency (μs)",
                              self._load_latency_distribution_ts, args=[hgrm_path]))
 
         return handles
@@ -544,9 +557,8 @@ class HdrAnalyzer:
 
 class GcAnalyzer:
 
-    def __init__(self, worker_dir, period):
+    def __init__(self, worker_dir):
         self.worker_dir = worker_dir
-        self.period = period
 
     def analyze(self):
         self.__make_gc_csv()
@@ -626,10 +638,6 @@ class GcAnalyzer:
             SeriesHandle("gc", "meta_total", "Meta/Perm size total", "Size",
                          self.__load_gc, args=[24, True], is_bytes=True))
 
-        # set the period
-        for handle in handles:
-            handle.period(self.period)
-
         return handles
 
     # Extracts a gc.csv file from the gc.log file
@@ -642,7 +650,7 @@ class GcAnalyzer:
             return
 
         cmd = "java -jar " + simulator_home + "/lib/gcviewer-1.35-SNAPSHOT.jar " + gc_log + " " + gc_csv + " -t CSV_FULL"
-        print(cmd)
+        # print(cmd)
         with open(os.devnull, 'w') as devnull:
             subprocess.check_call(cmd.split(), stdout=devnull, stderr=devnull)
 
@@ -666,9 +674,8 @@ class GcAnalyzer:
 
 
 class DstatAnalyzer:
-    def __init__(self, directory, agent_benchmark_periods):
+    def __init__(self, directory):
         self.directory = directory
-        self.agent_benchmark_periods = agent_benchmark_periods;
 
     def analyze(self):
         handles = []
@@ -679,107 +686,84 @@ class DstatAnalyzer:
                 continue
 
             agent_name = agent_for_worker(file_name)
-            period = self.agent_benchmark_periods[agent_name]
             dstat_file = os.path.join(self.directory, file_name)
 
             handles.append(
                 SeriesHandle("dstat", "memory_used_" + agent_name, "Memory Used", "Memory used",
-                             self.__load_dstat, args=[1, dstat_file], is_bytes=True,
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[1, dstat_file], is_bytes=True))
             handles.append(
                 SeriesHandle("dstat", "memory_buffered_" + agent_name, "Memory Buffered", "Memory Buffered",
-                             self.__load_dstat, args=[2, dstat_file], is_bytes=True,
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[2, dstat_file], is_bytes=True))
             handles.append(
                 SeriesHandle("dstat", "memory_cached_" + agent_name, "Memory Cached", "Memory Cached",
-                             self.__load_dstat, args=[3, dstat_file], is_bytes=True,
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[3, dstat_file], is_bytes=True))
             handles.append(
                 SeriesHandle("dstat", "memory_free_" + agent_name, "Memory Free", "Memory Free",
-                             self.__load_dstat, args=[4, dstat_file], is_bytes=True,
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[4, dstat_file], is_bytes=True))
 
             handles.append(
                 SeriesHandle("dstat", "cpu_user_" + agent_name, "CPU User", "CPU User %",
-                             self.__load_dstat, args=[5, dstat_file],
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[5, dstat_file]))
             handles.append(
                 SeriesHandle("dstat", "cpu_system_" + agent_name, "CPU System", "CPU System %",
-                             self.__load_dstat, args=[6, dstat_file],
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[6, dstat_file]))
             handles.append(
                 SeriesHandle("dstat", "cpu_idle_" + agent_name, "CPU Idle", "CPU Idle %",
-                             self.__load_dstat, args=[7, dstat_file],
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[7, dstat_file]))
             handles.append(
                 SeriesHandle("dstat", "cpu_wait_" + agent_name, "CPU Wait", "CPU Wait %",
-                             self.__load_dstat, args=[8, dstat_file],
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[8, dstat_file]))
             handles.append(
                 SeriesHandle("dstat", "cpu_total_" + agent_name, "CPU Total", "CPU Total %",
-                             self.__load_dstat_cpu_total_ts, args=[dstat_file],
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat_cpu_total_ts, args=[dstat_file]))
 
             handles.append(
                 SeriesHandle("dstat", "cpu_hardware_interrupts_" + agent_name, "CPU Hardware Interrupts",
                              "CPU Hardware Interrupts/sec",
-                             self.__load_dstat, args=[9, dstat_file],
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[9, dstat_file]))
             handles.append(
                 SeriesHandle("dstat", "cpu_software_interrupts_" + agent_name, "CPU Software Interrupts",
                              "CPU Software Interrupts/sec",
-                             self.__load_dstat, args=[10, dstat_file],
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[10, dstat_file]))
 
             handles.append(
                 SeriesHandle("dstat", "disk_read_" + agent_name, "Disk Reads", "Disk Reads/sec",
-                             self.__load_dstat, args=[11, dstat_file], is_bytes=True,
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[11, dstat_file], is_bytes=True))
             handles.append(
                 SeriesHandle("dstat", "disk_write_" + agent_name, "Disk Writes", "Disk writes/sec",
-                             self.__load_dstat, args=[12, dstat_file], is_bytes=True,
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[12, dstat_file], is_bytes=True))
 
             handles.append(
                 SeriesHandle("dstat", "net_receive_" + agent_name, "Net Receive", "Receiving/sec",
-                             self.__load_dstat, args=[13, dstat_file], is_bytes=True,
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[13, dstat_file], is_bytes=True))
             handles.append(
                 SeriesHandle("dstat", "net_send_" + agent_name, "Net Send", "Sending/sec",
-                             self.__load_dstat, args=[14, dstat_file], is_bytes=True,
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[14, dstat_file], is_bytes=True))
 
             handles.append(
                 SeriesHandle("dstat", "page_in_" + agent_name, "Page in", "Pages/sec",
-                             self.__load_dstat, args=[15, dstat_file],
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[15, dstat_file]))
             handles.append(
                 SeriesHandle("dstat", "page_out_" + agent_name, "Page out", "Pages/sec",
-                             self.__load_dstat, args=[16, dstat_file],
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[16, dstat_file]))
 
             handles.append(
                 SeriesHandle("dstat", "system_interrupts_" + agent_name, "System Interrupts", "System Interrupts/sec",
-                             self.__load_dstat, args=[17, dstat_file],
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[17, dstat_file]))
             handles.append(
                 SeriesHandle("dstat", "system_context_switches_" + agent_name, "System Context Switches",
                              "System Context Switches/sec",
-                             self.__load_dstat, args=[18, dstat_file],
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[18, dstat_file]))
 
             handles.append(
                 SeriesHandle("dstat", "load_average_1m_" + agent_name, "Load Average 1 Minute", "Load",
-                             self.__load_dstat, args=[19, dstat_file],
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[19, dstat_file]))
             handles.append(
                 SeriesHandle("dstat", "load_average_5m_" + agent_name, "Load Average 5 Minutes", "Load",
-                             self.__load_dstat, args=[20, dstat_file],
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[20, dstat_file]))
             handles.append(
                 SeriesHandle("dstat", "load_average_15m_" + agent_name, "Load Average 15 Minute", "Load",
-                             self.__load_dstat, args=[21, dstat_file],
-                             start_time=period.start_time, end_time=period.end_time))
+                             self.__load_dstat, args=[21, dstat_file]))
         return handles
 
     def __load_dstat(self, column, dstat_csv):
@@ -810,44 +794,62 @@ class DstatAnalyzer:
         return result
 
 
+# A single run from a single worker
+# A single worker can run many tests.
+# A worker run is the result of a single test on a single worker
+class WorkerRun:
+    start_time = 0
+    end_time = 0
+
+    def __init__(self, test_id):
+        self.key_values = []
+        self.test_id = test_id
+        self.handle = SeriesHandle("throughput", "throughput_" + test_id, "Throughput", "Operations/sec", self.__load)
+        self.handle.metadata["test"] = test_id
+
+    def __load(self):
+        return self.key_values
+
+
 # Analyzes the perform.csv for a worker.
-class ThroughputAnalyzer:
-    def __init__(self, worker_dir, worker_name, period):
+class PerformanceLogAnalyzer:
+    agent_benchmark_periods = None
+
+    def __init__(self, worker_dir, worker_name):
+        self.runs = {}
         self.worker_dir = worker_dir
         self.worker_name = worker_name
-        self.period = period
 
-    def analyze(self):
-        handles = []
-        handles.append(
-            SeriesHandle("throughput", "throughput_" + self.worker_name, "Throughput", "Operations/sec",
-                         self.__load_throughput, start_time=self.period.start_time, end_time=self.period.end_time))
-        return handles
-
-    def __load_throughput(self):
         performance_csv = os.path.join(self.worker_dir, "performance.csv")
-        result = []
+
         if os.path.exists(performance_csv):
             with open(performance_csv, 'rb') as csvfile:
                 csvreader = csv.reader(csvfile, delimiter=',', quotechar='|')
-                # skip the first line
+                # skip the first line since it contains the header.
                 next(csvreader)
                 for row in csvreader:
-                    result.append(KeyValue(row[0], row[4]))
-        return result
+                    test_id = row[2]
+                    run = self.runs.get(test_id)
+                    if run is None:
+                        run = WorkerRun(test_id)
+                        self.runs[test_id] = run
+                    run.key_values.append(KeyValue(row[0], row[5]))
 
 
 class Worker:
     name = ""
     worker_dir = ""
 
-    def __init__(self, worker_dir, period):
+    def __init__(self, worker_dir):
         self.worker_dir = worker_dir
         self.name = os.path.basename(worker_dir)
-        self.period = period
+        self.performanceLog = PerformanceLogAnalyzer(self.worker_dir, self.name)
         self.handles = []
-        self.handles.extend(ThroughputAnalyzer(self.worker_dir, self.name, period).analyze())
-        self.handles.extend(GcAnalyzer(self.worker_dir, period).analyze())
+        for k in self.performanceLog.runs:
+            # print("adding handle:"+k)
+            self.handles.append(self.performanceLog.runs[k].handle)
+
+        self.handles.extend(GcAnalyzer(self.worker_dir).analyze())
         self.handles.extend(HdrAnalyzer(self.worker_dir).analyze())
 
 
@@ -857,33 +859,16 @@ class Period:
         self.end_time = end_time
 
 
-class Benchmark:
+class Session:
     # the directory where the original files can be found
     src_dir = ""
     workers = None
     name = ""
-    agent_benchmark_periods = None
 
     def __init__(self, src_dir, name):
         self.src_dir = src_dir
         self.name = name
-        self.agent_benchmark_periods = {}
         self.handles = []
-
-        # Load the periods
-        for file_name in os.listdir(src_dir):
-            if not file_name.endswith(".time"):
-                continue
-
-            agent_name = agent_for_worker(file_name)
-            csv_file = os.path.join(src_dir, file_name)
-            with open(csv_file, 'rb') as time_file:
-                csvreader = csv.reader(time_file, delimiter=',', quotechar='|')
-                start_time = str(int(next(csvreader)[1]) + warmup)
-                end_time = str(int(next(csvreader)[1]) - cooldown)
-                print("start_time:" + start_time)
-                print("end_time_ms:" + end_time)
-                self.agent_benchmark_periods[agent_name] = Period(start_time, end_time)
 
         # load all workers
         self.workers = []
@@ -893,20 +878,38 @@ class Benchmark:
                 continue
             if not subdir_name.startswith("A"):
                 continue
-            agent_name = agent_for_worker(subdir_name)
-            agent_benchmark_time = self.agent_benchmark_periods[agent_name]
-            self.workers.append(Worker(subdir, agent_benchmark_time))
+            self.workers.append(Worker(subdir))
 
         # making sure there are workers; otherwise it is an invalid benchmark
         if len(self.workers) == 0:
             print("Invalid Benchmark " + self.name + " from directory [" + self.src_dir + "]; no workers found")
             exit(1)
 
-        # look for all latency info
+        # groups all the throughput information per test.
+        # todo: the problem is that the throughput information is now pulled into memory
+        throughput_aggregated_per_test = {}
+        for worker in self.workers:
+            for test_id in worker.performanceLog.runs.keys():
+                ts_list = throughput_aggregated_per_test.get(test_id)
+                if ts_list is None:
+                    ts_list = []
+                    throughput_aggregated_per_test[test_id] = ts_list
+                ts_list.append(worker.performanceLog.runs[test_id].handle.load())
 
-        self.handles.append(
-            SeriesHandle("throughput", "throughput", "Throughput", "Operations/sec", self.aggregated_throughput))
-        self.handles.extend(DstatAnalyzer(src_dir, self.agent_benchmark_periods).analyze())
+        # adds
+        for test_id in throughput_aggregated_per_test.keys():
+            print("test_id:" + test_id)
+
+            def getter():
+                return Series("", "", False, False, ts_list=throughput_aggregated_per_test[test_id]).items
+
+            handle = SeriesHandle("throughput", "throughput_" + test_id, "Throughput", "Operations/sec",
+                                  getter)
+
+            handle.metadata["test"] = test_id
+            self.handles.append(handle)
+
+        self.handles.extend(DstatAnalyzer(src_dir).analyze())
         self.handles.extend(HdrAnalyzer(src_dir).analyze())
 
         agents = {}
@@ -919,110 +922,127 @@ class Benchmark:
     def x(self, handle):
         return handle.load().items
 
-    def aggregated_throughput(self):
-        ts_list = []
-        for worker in self.workers:
-            for handle in worker.handles:
-                if handle.src == "throughput":
-                    ts_list.append(handle.load())
-        return Series("", "", False, False, ts_list=ts_list).items
+    # def aggregated_throughput(self, testId):
+    #     ts_list = []
+    #     for worker in self.workers:
+    #         for run in worker.performanceLog.runs:
+    #             if handle.src == "throughput":
+    #                 ts_list.append(handle.load())
+    #     return
 
 
 class Comparison:
+    plots = None
+
     def __init__(self):
-        benchmark_dirs = []
-        benchmark_names = {}
-        last_benchmark = None
+        self.plots = {}
+        session_dirs = []
+        session_names = {}
+        last_session = None
 
         print("Loading benchmarks")
 
         # collect all benchmark directories and the names for the benchmarks
-        for benchmark_arg in benchmark_args:
-            if benchmark_arg.startswith("[") and benchmark_arg.endswith("]"):
-                if not last_benchmark:
-                    print("Benchmark name " + benchmark_arg + " must be preceded with a benchmark directory.")
+        for session_arg in session_args:
+            if session_arg.startswith("[") and session_arg.endswith("]"):
+                if not last_session:
+                    print("Benchmark name " + session_arg + " must be preceded with a benchmark directory.")
                     exit()
-                benchmark_names[last_benchmark] = benchmark_arg[1:len(benchmark_arg) - 1]
-                last_benchmark = None
+                session_names[last_session] = session_arg[1:len(session_arg) - 1]
+                last_session = None
             else:
-                benchmark_dir = benchmark_arg
-                if not os.path.exists(benchmark_dir):
-                    print("benchmark directory '" + benchmark_dir + "' does not exist!")
+                session_dir = session_arg
+                if not os.path.exists(session_dir):
+                    print("benchmark directory '" + session_dir + "' does not exist!")
                     exit(1)
-                last_benchmark = benchmark_arg
-                benchmark_dirs.append(benchmark_dir)
-                name = os.path.basename(os.path.normpath(benchmark_dir))
-                benchmark_names[benchmark_dir] = name
+                last_session = session_arg
+                session_dirs.append(session_dir)
+                name = os.path.basename(os.path.normpath(session_dir))
+                session_names[session_dir] = name
 
         # Make the benchmarks
-        self.benchmarks = []
-        for benchmark_dir in benchmark_dirs:
-            cmd = simulator_home + "/conf/hdr.sh " + benchmark_dir
+        self.sessions = []
+        for session_dir in session_dirs:
+            cmd = simulator_home + "/conf/hdr.sh " + session_dir
             subprocess.check_output(cmd.split())
-            self.benchmarks.append(Benchmark(benchmark_dir, benchmark_names[benchmark_dir]))
+            self.sessions.append(Session(session_dir, session_names[session_dir]))
+        print("finished collecting benchmark data")
 
     def output_dir(self, name):
         output_dir = os.path.join(report_dir, name)
         ensure_dir(output_dir)
         return output_dir
 
+    # should be renamed
     def compare(self):
-        plots = {}
 
         # plot benchmark/machine level metrics
-        for benchmark in self.benchmarks:
-            if len(benchmark.handles) == 0:
-                print(" benchmark [" + benchmark.name + "] benchmark.dir [" + benchmark.src_dir + "] has no data")
+        self.add_session_level_metrics()
+
+        self.add_worker_level_metrics()
+
+        for plot in self.plots.values():
+            plot.plot()
+
+        print("Done writing report [" + report_dir + "]")
+        for session in self.sessions:
+            print(" benchmark [" + session.name + "] benchmark.dir [" + session.src_dir + "]")
+
+    def add_session_level_metrics(self):
+        for session in self.sessions:
+            if len(session.handles) == 0:
+                print(" benchmark [" + session.name + "] benchmark.dir [" + session.src_dir + "] has no data")
                 exit(1)
 
-            for handle in benchmark.handles:
-                plot = plots.get(handle.name)
+            for handle in session.handles:
+                print(" benchmark level metrics handle.name:" + handle.name + " handle.src")
+                plot = self.plots.get(handle.name)
                 if not plot:
                     if handle.src == "latency-distribution":
                         plot = LatencyDistributionGnuplot(self.output_dir("latency"), handle.title)
                     else:
                         plot = TimeseriesGnuplot(self.output_dir(handle.src), handle.title)
 
-                    plots[handle.name] = plot
+                    self.plots[handle.name] = plot
 
-                plot.add(handle.load(), title=benchmark.name)
+                plot.add(handle.load(), title=session.name)
 
-        # plot worker level metrics
-        if args.full:
-            for benchmark in self.benchmarks:
-                for worker in benchmark.workers:
-                    for handle in worker.handles:
-                        if handle.src == "throughput":
-                            plot = plots.get("throughput_per_worker")
-                            if not plot:
-                                plot = TimeseriesGnuplot(self.output_dir(handle.src),
-                                                         "Throughput per worker",
-                                                         basefilename="throughput_per_worker")
-                                plots["throughput_per_worker"] = plot
+    def add_worker_level_metrics(self):
+        if not args.full:
+            return
 
-                            if len(self.benchmarks) > 1:
-                                plot.add(handle.load(), benchmark.name + "_" + worker.name)
-                            else:
-                                plot.add(handle.load(), worker.name)
+        for session in self.sessions:
+            for worker in session.workers:
+                for handle in worker.handles:
+                    print("worker level metrics handle.name:" + handle.name + " handle.src")
+
+                    # todo: we need to differentiate on test.
+                    if handle.src == "throughput":
+                        x = "throughput_"+handle.metadata["test"]+"_per_worker"
+                        plot = self.plots.get(x)
+                        if not plot:
+                            plot = TimeseriesGnuplot(self.output_dir(handle.src),
+                                                     "Throughput per worker",
+                                                     basefilename=x)
+                            self.plots[x] = plot
+
+                        if len(self.sessions) > 1:
+                            plot.add(handle.load(), session.name + "_" + worker.name)
                         else:
-                            name = handle.name + "_" + worker.name
-                            plot = plots.get(name)
-                            title = worker.name + " " + handle.title
-                            if not plot:
-                                if handle.src == "latency-distribution":
-                                    plot = LatencyDistributionGnuplot(self.output_dir("latency"), title, basefilename=name)
-                                else:
-                                    plot = TimeseriesGnuplot(self.output_dir(handle.src), title, basefilename=name)
-                                plots[name] = plot
+                            plot.add(handle.load(), worker.name)
+                    else:
+                        name = handle.name + "_" + worker.name
+                        plot = self.plots.get(name)
+                        title = worker.name + " " + handle.title
+                        if not plot:
+                            if handle.src == "latency-distribution":
+                                plot = LatencyDistributionGnuplot(self.output_dir("latency"), title,
+                                                                  basefilename=name)
+                            else:
+                                plot = TimeseriesGnuplot(self.output_dir(handle.src), title, basefilename=name)
+                            self.plots[name] = plot
 
-                            plot.add(handle.load(), benchmark.name)
-
-        for plot in plots.values():
-            plot.plot()
-
-        print("Done writing report [" + report_dir + "]")
-        for benchmark in self.benchmarks:
-            print(" benchmark [" + benchmark.name + "] benchmark.dir [" + benchmark.src_dir + "]")
+                        plot.add(handle.load(), session.name)
 
 
 comparison = Comparison()
