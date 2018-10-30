@@ -105,7 +105,7 @@ public class JetDriver extends VendorDriver<JetInstance> {
     }
 
     private String loadJvmOptions(String argsProperty) {
-        return get(argsProperty, "") + " -Dhazelcast.logging.type=log4j";
+        return get(argsProperty, "");// + " -Dhazelcast.logging.type=log4j";
     }
 
     @Override
