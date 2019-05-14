@@ -15,8 +15,8 @@
  */
 package com.hazelcast.simulator.hazelfast;
 
-import com.hazelcast.networktester.Client;
-import com.hazelcast.networktester.Server;
+import com.hazelfast.Client;
+import com.hazelfast.Server;
 import com.hazelcast.simulator.agent.workerprocess.WorkerParameters;
 import com.hazelcast.simulator.vendors.HazelcastDriver;
 import com.hazelcast.simulator.vendors.VendorDriver;
@@ -79,7 +79,6 @@ public class HazelfastDriver extends VendorDriver {
         }
         return null;
     }
-
 
     @Override
     public void startVendorInstance() throws Exception {

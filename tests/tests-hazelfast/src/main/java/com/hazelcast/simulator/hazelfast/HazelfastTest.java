@@ -15,7 +15,7 @@
  */
 package com.hazelcast.simulator.hazelfast;
 
-import com.hazelcast.networktester.Client;
+import com.hazelfast.Client;
 import com.hazelcast.simulator.test.TestContext;
 import com.hazelcast.simulator.test.annotations.InjectTestContext;
 import com.hazelcast.simulator.test.annotations.InjectVendor;
