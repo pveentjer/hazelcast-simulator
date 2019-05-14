@@ -59,7 +59,7 @@ fi
 
 # hack to get hz enterprise working
 if [ "$VENDOR" = "hazelfast" ]; then
-    uploadLibraryJar "network-tester-*"
+    uploadLibraryJar "hazelfast-*"
 fi
 
 # hack to get ignite working
