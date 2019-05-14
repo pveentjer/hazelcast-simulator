@@ -102,5 +102,13 @@
                 <include>com.hazelcast.simulator:tests-jedis</include>
             </includes>
         </dependencySet>
+
+        <dependencySet>
+            <outputDirectory>test-lib/tests-hazelfast</outputDirectory>
+            <useProjectArtifact>false</useProjectArtifact>
+            <includes>
+                <include>com.hazelcast.simulator:tests-hazelfast</include>
+            </includes>
+        </dependencySet>
     </dependencySets>
 </assembly>

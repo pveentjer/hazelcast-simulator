@@ -82,6 +82,11 @@
             <artifactId>tests-jedis</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.hazelcast.simulator</groupId>
+            <artifactId>tests-hazelfast</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>

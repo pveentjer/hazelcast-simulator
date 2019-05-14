@@ -31,5 +31,6 @@
         <module>tests-mongodb</module>
         <module>tests-lettuce</module>
         <module>tests-jedis</module>
+        <module>tests-hazelfast</module>
     </modules>
 </project>
