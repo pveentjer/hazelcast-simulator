@@ -86,11 +86,12 @@ public class HazelfastDriver extends VendorDriver {
 
         LOGGER.info(format("%s HazelcastInstance starting", workerType));
         if ("javaclient".equals(workerType)) {
-            Client.Context context = new Client.Context().hostname(get("hostname"));
+            Client.Context context = new Client.Context()
+                    .hostname(get("hostname"));
             client = new Client(context);
             client.start();
         } else {
-            Server.Context context = new Server.Context().setHostname(get("hostname"));
+            Server.Context context = new Server.Context();
             server = new Server(context);
             server.start();
         }
