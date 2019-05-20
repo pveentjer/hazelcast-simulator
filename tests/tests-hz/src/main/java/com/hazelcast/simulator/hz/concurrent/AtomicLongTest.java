@@ -16,23 +16,41 @@
 
 package com.hazelcast.simulator.hz.concurrent;
 
+import com.hazelcast.core.ExecutionCallback;
 import com.hazelcast.core.IAtomicLong;
+import com.hazelcast.core.ICompletableFuture;
+import com.hazelcast.core.Pipelining;
 import com.hazelcast.simulator.hz.HazelcastTest;
+import com.hazelcast.simulator.probes.Probe;
 import com.hazelcast.simulator.test.BaseThreadState;
 import com.hazelcast.simulator.test.annotations.Setup;
+import com.hazelcast.simulator.test.annotations.StartNanos;
 import com.hazelcast.simulator.test.annotations.Teardown;
 import com.hazelcast.simulator.test.annotations.TimeStep;
+
+import java.util.concurrent.Executor;
 
 public class AtomicLongTest extends HazelcastTest {
 
     public int countersLength = 1000;
+    public int pipelineDepth = 10;
+    public int pipelineIterations = -1;
 
     private IAtomicLong[] counters;
+    private final Executor callerRuns = new Executor() {
+        @Override
+        public void execute(Runnable command) {
+            command.run();
+        }
+    };
+
 
     @Setup
     public void setup() {
         counters = new IAtomicLong[countersLength];
-
+        if (pipelineIterations == -1) {
+            pipelineIterations = pipelineDepth;
+        }
         for (int i = 0; i < countersLength; i++) {
             counters[i] = targetInstance.getAtomicLong("" + i);
         }
@@ -48,7 +66,35 @@ public class AtomicLongTest extends HazelcastTest {
         return state.randomCounter().incrementAndGet();
     }
 
+    @TimeStep(prob = 0)
+    public void pipelinedGet(final ThreadState state, final @StartNanos long startNanos, final Probe probe) throws Exception {
+        if (state.pipeline == null) {
+            state.pipeline = new Pipelining<Long>(pipelineDepth);
+        }
+        ICompletableFuture<Long> f = state.randomCounter().getAsync();
+        f.andThen(new ExecutionCallback<Long>() {
+            @Override
+            public void onResponse(Long response) {
+                probe.done(startNanos);
+            }
+
+            @Override
+            public void onFailure(Throwable t) {
+                probe.done(startNanos);
+            }
+        }, callerRuns);
+        state.pipeline.add(f);
+        state.i++;
+        if (state.i == pipelineIterations) {
+            state.i = 0;
+            state.pipeline.results();
+            state.pipeline = null;
+        }
+    }
+
     public class ThreadState extends BaseThreadState {
+        public int i;
+        private Pipelining pipeline;
 
         private IAtomicLong randomCounter() {
             int index = randomInt(counters.length);
