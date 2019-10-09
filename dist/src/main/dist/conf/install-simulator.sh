@@ -33,6 +33,8 @@ uploadLibraryJar "activemq-core*"
 uploadLibraryJar "geronimo-jms*"
 uploadLibraryJar "geronimo-j2ee*"
 uploadLibraryJar "slf4j-api*"
+uploadLibraryJar "affinity*"
+uploadLibraryJar "jna*"
 
 uploadLibraryJar "cache-api*"
 uploadLibraryJar "commons-codec*"
