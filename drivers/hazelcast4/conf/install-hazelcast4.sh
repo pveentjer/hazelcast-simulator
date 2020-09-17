@@ -13,7 +13,7 @@
 # - instead of download artifacts to local machine and then uploading; download them on the target machine
 # - instead of uploading to each machine, upload to a single machine and then download from that machine
 
-. ${SIMULATOR_HOME}/drivers/driver-hazelcast3/conf/install-hazelcast-support3.sh
+. ${SIMULATOR_HOME}/drivers/hazelcast4/conf/install-hazelcast-support4.sh
 
 session_id=$1
 version_spec=$2
@@ -30,7 +30,6 @@ prepare()
         release_repo="https://oss.sonatype.org/content/repositories/releases"
 
         prepare_using_maven "hazelcast" "$maven_version" ${release_repo} ${snapshot_repo}
-        prepare_using_maven "hazelcast-client" "$maven_version" ${release_repo} ${snapshot_repo}
     elif [[ ${version_spec} == git* ]] ; then
         git_branch=${version_spec#*=}
 

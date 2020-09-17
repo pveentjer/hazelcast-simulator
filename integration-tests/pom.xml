@@ -27,9 +27,10 @@
             <artifactId>simulator</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
+
         <dependency>
             <groupId>com.hazelcast.simulator</groupId>
-            <artifactId>driver-hazelcast4</artifactId>
+            <artifactId>hazelcast4</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
 

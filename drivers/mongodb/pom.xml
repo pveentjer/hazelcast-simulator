@@ -2,8 +2,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>driver-memcached</artifactId>
-    <name>Simulator Driver Memcached</name>
+    <artifactId>mongodb</artifactId>
+    <name>Simulator Driver Mongodb</name>
 
     <parent>
         <groupId>com.hazelcast.simulator</groupId>
@@ -18,8 +18,7 @@
 
     <properties>
         <main.basedir>${project.parent.basedir}</main.basedir>
-        <memcached-javaclient.version>2.12.3</memcached-javaclient.version>
-        <javassist.version>3.12.1.GA</javassist.version>
+        <mongodb-javaclient.version>3.8.0</mongodb-javaclient.version>
     </properties>
 
     <build>
@@ -57,11 +56,10 @@
             <scope>provided</scope>
         </dependency>
 
-
         <dependency>
-            <groupId>net.spy</groupId>
-            <artifactId>spymemcached</artifactId>
-            <version>${memcached-javaclient.version}</version>
+            <groupId>org.mongodb</groupId>
+            <artifactId>mongo-java-driver</artifactId>
+            <version>${mongodb-javaclient.version}</version>
         </dependency>
     </dependencies>
 </project>

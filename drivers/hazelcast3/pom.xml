@@ -3,7 +3,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>driver-hazelcast3</artifactId>
+    <artifactId>hazelcast3</artifactId>
     <name>Simulator Driver Hazelcast 3.x</name>
 
     <parent>

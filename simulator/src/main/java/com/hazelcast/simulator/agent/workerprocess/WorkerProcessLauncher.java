@@ -227,14 +227,14 @@ public class WorkerProcessLauncher {
             String hzVersionDirectory = directoryForVersionSpec(parameters.get("VERSION_SPEC"));
             classpath += CLASSPATH_SEPARATOR + simulatorHome + "/driver-lib/" + hzVersionDirectory + "/*";
             // the common test classes.
-            classpath += CLASSPATH_SEPARATOR + simulatorHome + "/drivers/driver-hazelcast3/*";
+            classpath += CLASSPATH_SEPARATOR + simulatorHome + "/drivers/hazelcast3/*";
         } else if ("hazelcast4".equals(driver) || "hazelcast-enterprise4".equals(driver)) {
             String hzVersionDirectory = directoryForVersionSpec(parameters.get("VERSION_SPEC"));
             classpath += CLASSPATH_SEPARATOR + simulatorHome + "/driver-lib/" + hzVersionDirectory + "/*";
             // the common test classes.
-            classpath += CLASSPATH_SEPARATOR + simulatorHome + "/drivers/driver-hazelcast4/*";
+            classpath += CLASSPATH_SEPARATOR + simulatorHome + "/drivers/hazelcast4/*";
         } else {
-            classpath += CLASSPATH_SEPARATOR + simulatorHome + "/drivers/driver-" + driver + "/*";
+            classpath += CLASSPATH_SEPARATOR + simulatorHome + "/drivers/" + driver + "/*";
         }
 
         return classpath;

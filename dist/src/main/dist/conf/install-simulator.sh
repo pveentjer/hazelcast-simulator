@@ -13,8 +13,8 @@ uploadLibraryJar(){
 
 uploadTestLibJar(){
     pattern=$1
-    src="$SIMULATOR_HOME/drivers/driver-$VENDOR/$pattern"
-    rsync --checksum -avv -L -e "ssh $SSH_OPTIONS" $src $SIMULATOR_USER@$agent:hazelcast-simulator-$SIMULATOR_VERSION/drivers/driver-$VENDOR/
+    src="$SIMULATOR_HOME/drivers/$DRIVER/$pattern"
+    rsync --checksum -avv -L -e "ssh $SSH_OPTIONS" $src $SIMULATOR_USER@$agent:hazelcast-simulator-$SIMULATOR_VERSION/drivers/$DRIVER/
 }
 
 uploadToRemoteSimulatorDir(){

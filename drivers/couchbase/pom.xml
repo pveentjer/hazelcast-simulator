@@ -2,8 +2,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>driver-lettuce5</artifactId>
-    <name>Simulator Driver Lettuce 5.x</name>
+    <artifactId>couchbase</artifactId>
+    <name>Simulator Driver Couchbase</name>
 
     <parent>
         <groupId>com.hazelcast.simulator</groupId>
@@ -18,7 +18,8 @@
 
     <properties>
         <main.basedir>${project.parent.basedir}</main.basedir>
-       <lettuce.version>5.2.2.RELEASE</lettuce.version>
+        <couchbase-javaclient.version>2.4.3</couchbase-javaclient.version>
+        <javassist.version>3.12.1.GA</javassist.version>
     </properties>
 
     <build>
@@ -26,7 +27,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
-                <version>3.1.2</version>
+                <version>${maven-dependency-plugin.version}</version>
                 <executions>
                     <execution>
                         <id>copy-dependencies</id>
@@ -57,9 +58,9 @@
         </dependency>
 
         <dependency>
-            <groupId>io.lettuce</groupId>
-            <artifactId>lettuce-core</artifactId>
-            <version>${lettuce.version}</version>
+            <groupId>com.couchbase.client</groupId>
+            <artifactId>java-client</artifactId>
+            <version>${couchbase-javaclient.version}</version>
         </dependency>
     </dependencies>
 </project>

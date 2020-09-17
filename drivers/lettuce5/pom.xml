@@ -2,8 +2,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>driver-mongodb</artifactId>
-    <name>Simulator Driver Mongodb</name>
+    <artifactId>lettuce5</artifactId>
+    <name>Simulator Driver Lettuce 5.x</name>
 
     <parent>
         <groupId>com.hazelcast.simulator</groupId>
@@ -18,7 +18,7 @@
 
     <properties>
         <main.basedir>${project.parent.basedir}</main.basedir>
-        <mongodb-javaclient.version>3.8.0</mongodb-javaclient.version>
+       <lettuce.version>5.2.2.RELEASE</lettuce.version>
     </properties>
 
     <build>
@@ -26,7 +26,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
-                <version>${maven-dependency-plugin.version}</version>
+                <version>3.1.2</version>
                 <executions>
                     <execution>
                         <id>copy-dependencies</id>
@@ -57,9 +57,9 @@
         </dependency>
 
         <dependency>
-            <groupId>org.mongodb</groupId>
-            <artifactId>mongo-java-driver</artifactId>
-            <version>${mongodb-javaclient.version}</version>
+            <groupId>io.lettuce</groupId>
+            <artifactId>lettuce-core</artifactId>
+            <version>${lettuce.version}</version>
         </dependency>
     </dependencies>
 </project>

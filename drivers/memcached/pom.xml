@@ -2,8 +2,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>driver-jedis3</artifactId>
-    <name>Simulator Driver Jedis 3.x</name>
+    <artifactId>memcached</artifactId>
+    <name>Simulator Driver Memcached</name>
 
     <parent>
         <groupId>com.hazelcast.simulator</groupId>
@@ -18,7 +18,8 @@
 
     <properties>
         <main.basedir>${project.parent.basedir}</main.basedir>
-        <jedis.version>3.2.0</jedis.version>
+        <memcached-javaclient.version>2.12.3</memcached-javaclient.version>
+        <javassist.version>3.12.1.GA</javassist.version>
     </properties>
 
     <build>
@@ -56,16 +57,11 @@
             <scope>provided</scope>
         </dependency>
 
-        <dependency>
-            <groupId>redis.clients</groupId>
-            <artifactId>jedis</artifactId>
-            <version>${jedis.version}</version>
-        </dependency>
 
         <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-pool2</artifactId>
-            <version>2.3</version>
+            <groupId>net.spy</groupId>
+            <artifactId>spymemcached</artifactId>
+            <version>${memcached-javaclient.version}</version>
         </dependency>
     </dependencies>
 </project>

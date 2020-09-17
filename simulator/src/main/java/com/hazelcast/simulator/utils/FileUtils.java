@@ -425,11 +425,11 @@ public final class FileUtils {
         }
 
         if (driver.equals("hazelcast-enterprise4")) {
-            file = newFile(getSimulatorHome(), "drivers", "driver-hazelcast4", "conf", filename);
+            file = newFile(getSimulatorHome(), "drivers", "hazelcast4", "conf", filename);
         } else if (driver.equals("hazelcast-enterprise3")) {
-            file = newFile(getSimulatorHome(), "drivers", "driver-hazelcast3", "conf", filename);
+            file = newFile(getSimulatorHome(), "drivers", "hazelcast3", "conf", filename);
         } else {
-            file = newFile(getSimulatorHome(), "drivers", "driver-" + driver, "conf", filename);
+            file = newFile(getSimulatorHome(), "drivers", driver, "conf", filename);
         }
 
         file = file.getAbsoluteFile();

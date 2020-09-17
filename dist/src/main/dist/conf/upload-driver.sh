@@ -9,11 +9,11 @@ upload_driver() {
 }
 
 if [ "$DRIVER" = "hazelcast-enterprise4" ]; then
-  driver_dir=drivers/driver-hazelcast4
+  driver_dir=drivers/hazelcast4
 elif [ "$DRIVER" = "hazelcast-enterprise3" ]; then
-  driver_dir=drivers/driver-hazelcast3
+  driver_dir=drivers/hazelcast3
 else
-  driver_dir=drivers/driver-$DRIVER
+  driver_dir=drivers/$DRIVER
 fi
 
 echo "[INFO] Uploading driver $DRIVER"
